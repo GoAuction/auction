@@ -1,0 +1,13 @@
+.git
+.gitignore
+.idea
+.vscode
+bin
+dist
+pkg/tmp
+vendor
+*.log
+*.tmp
+config/*.local.yaml
+config/*.example.yaml
+.cache

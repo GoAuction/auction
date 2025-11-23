@@ -1,0 +1,16 @@
+# Air configuration for local development
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/auction ./main.go"
+bin = "./tmp/auction"
+full_bin = "./tmp/auction"
+include_ext = ["go", "mod", "sum", "yaml"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true
