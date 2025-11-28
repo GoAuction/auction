@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS items (
 
     -- Fiyat alanları
     start_price   NUMERIC(10,2) NOT NULL CHECK (start_price >= 0),
-    current_price NUMERIC(10,2) NOT NULL CHECK (current_price >= 0),
+    current_price NUMERIC(10,2) NOT NULL CHECK (current_price >= 0) DEFAULT 0,
     bid_increment NUMERIC(10,2) NULL CHECK (bid_increment IS NULL OR bid_increment > 0),
 
     reserve_price NUMERIC(10,2) CHECK (reserve_price IS NULL OR reserve_price >= 0),

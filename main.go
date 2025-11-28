@@ -3,6 +3,7 @@ package main
 import (
 	"auction/app/item"
 	"auction/infra/postgres"
+	"auction/internal/middleware"
 	"auction/pkg/config"
 	"auction/pkg/httperror"
 	"context"
@@ -93,13 +94,19 @@ func main() {
 	)
 
 	createItemHadler := item.NewCreateItemHandler(pgRepository)
+	getItemsHandler := item.NewGetItemsHandler(pgRepository)
+	getItemHandler := item.NewGetItemHandler(pgRepository)
+	deleteItemHandler := item.NewDeleteItemHandler(pgRepository)
+	updateItemHandler := item.NewUpdateItemHandler(pgRepository)
 
-	publicRoutes := app.Group("/api/v1")
-	publicRoutes.Get("/items", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
-	publicRoutes.Get("/items/:item", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
+	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
+
+	publicRoutes := app.Group("/api/v1", securityHeadersHandler)
+	publicRoutes.Get("/items", handle[item.GetItemsRequest, item.GetItemsResponse](getItemsHandler))
+	publicRoutes.Get("/items/:id", handle[item.GetItemRequest, item.GetItemResponse](getItemHandler))
 	publicRoutes.Post("/items", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
-	publicRoutes.Put("/items/:item", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
-	publicRoutes.Delete("/items/:item", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
+	publicRoutes.Put("/items/:id", handle[item.UpdateItemRequest, item.UpdateItemResponse](updateItemHandler))
+	publicRoutes.Delete("/items/:id", handle[item.DeleteItemRequest, item.DeleteItemResponse](deleteItemHandler))
 
 	// Start server in a goroutine
 	go func() {

@@ -4,4 +4,4 @@ postgres_password: "postgres"
 postgres_database: "auction"
 postgres_sslmode: "disable"
 postgres_host: "host.docker.internal"
-postgres_port: 5432
+postgres_port: 5433

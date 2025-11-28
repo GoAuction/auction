@@ -14,7 +14,7 @@ services:
       POSTGRES_DATABASE: auction
       POSTGRES_SSLMODE: disable
       POSTGRES_HOST: auction-postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_PORT: 5433
     depends_on:
       auction-postgres:
         condition: service_healthy
@@ -60,7 +60,7 @@ services:
       - auction-postgres-data:/var/lib/postgresql
       - ./infra/postgres/migrations:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
