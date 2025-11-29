@@ -1,2 +1,31 @@
 .cache
 tmp
+
+# Environment variables (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# Old config files (deprecated)
+config/config.yaml
+
+# Build artifacts
+auction
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

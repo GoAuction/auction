@@ -3,6 +3,7 @@ package main
 import (
 	"auction/app/item"
 	"auction/infra/postgres"
+	"auction/infra/rabbitmq"
 	"auction/internal/middleware"
 	"auction/pkg/config"
 	"auction/pkg/httperror"
@@ -93,20 +94,37 @@ func main() {
 		appConfig.PostgresPort,
 	)
 
-	createItemHadler := item.NewCreateItemHandler(pgRepository)
+	// Initialize RabbitMQ publisher
+	var eventPublisher *rabbitmq.RabbitMQPublisher
+	var err error
+	if appConfig.RabbitMQURL != "" {
+		eventPublisher, err = rabbitmq.NewRabbitMQPublisher(
+			appConfig.RabbitMQURL,
+			appConfig.ServiceName,
+		)
+		if err != nil {
+			zap.L().Error("Failed to initialize RabbitMQ publisher", zap.Error(err))
+		} else {
+			defer eventPublisher.Close()
+		}
+	}
+
+	createItemHadler := item.NewCreateItemHandler(pgRepository, eventPublisher)
 	getItemsHandler := item.NewGetItemsHandler(pgRepository)
 	getItemHandler := item.NewGetItemHandler(pgRepository)
-	deleteItemHandler := item.NewDeleteItemHandler(pgRepository)
-	updateItemHandler := item.NewUpdateItemHandler(pgRepository)
+	deleteItemHandler := item.NewDeleteItemHandler(pgRepository, eventPublisher)
+	updateItemHandler := item.NewUpdateItemHandler(pgRepository, eventPublisher)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
-	publicRoutes := app.Group("/api/v1", securityHeadersHandler)
+	publicRoutes := app.Group("/api/v1")
 	publicRoutes.Get("/items", handle[item.GetItemsRequest, item.GetItemsResponse](getItemsHandler))
 	publicRoutes.Get("/items/:id", handle[item.GetItemRequest, item.GetItemResponse](getItemHandler))
-	publicRoutes.Post("/items", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
-	publicRoutes.Put("/items/:id", handle[item.UpdateItemRequest, item.UpdateItemResponse](updateItemHandler))
-	publicRoutes.Delete("/items/:id", handle[item.DeleteItemRequest, item.DeleteItemResponse](deleteItemHandler))
+
+	privateRoutes := app.Group("/api/v1", securityHeadersHandler)
+	privateRoutes.Post("/items", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
+	privateRoutes.Put("/items/:id", handle[item.UpdateItemRequest, item.UpdateItemResponse](updateItemHandler))
+	privateRoutes.Delete("/items/:id", handle[item.DeleteItemRequest, item.DeleteItemResponse](deleteItemHandler))
 
 	// Start server in a goroutine
 	go func() {

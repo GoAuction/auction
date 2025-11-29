@@ -7,32 +7,52 @@ import (
 )
 
 type AppConfig struct {
-	Port             string `mapstructure:"port" yaml:"port"`
-	PostgresUsername string `mapstructure:"postgres_username" yaml:"postgres_username"`
-	PostgresPassword string `mapstructure:"postgres_password" yaml:"postgres_password"`
-	PostgresDatabase string `mapstructure:"postgres_database" yaml:"postgres_database"`
-	PostgresSSLMode  string `mapstructure:"postgres_sslmode" yaml:"postgres_sslmode"`
-	PostgresHost     string `mapstructure:"postgres_host" yaml:"postgres_host"`
-	PostgresPort     string `mapstructure:"postgres_port" yaml:"postgres_port"`
+	Port             string `mapstructure:"PORT"`
+	PostgresUsername string `mapstructure:"POSTGRES_USERNAME"`
+	PostgresPassword string `mapstructure:"POSTGRES_PASSWORD"`
+	PostgresDatabase string `mapstructure:"POSTGRES_DATABASE"`
+	PostgresSSLMode  string `mapstructure:"POSTGRES_SSLMODE"`
+	PostgresHost     string `mapstructure:"POSTGRES_HOST"`
+	PostgresPort     string `mapstructure:"POSTGRES_PORT"`
+	RabbitMQURL      string `mapstructure:"RABBITMQ_URL"`
+	ServiceName      string `mapstructure:"SERVICE_NAME"`
 }
 
 func Read() *AppConfig {
-	viper.SetConfigName("config")      // name of config file (without extension)
-	viper.SetConfigType("yaml")        // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("$PWD/config") // call multiple times to add many search paths
-	viper.AddConfigPath(".")           // optionally look for config in the working directory
-	viper.AddConfigPath("/config")     // optionally look for config in the working directory
-	viper.AddConfigPath("./config")    // optionally look for config in the working directory
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil {             // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
-	}
+	viper.SetConfigFile(".env")
+	viper.SetConfigType("env")
+	_ = viper.ReadInConfig()
+
+	viper.AutomaticEnv()
+
+	bindEnvVariables()
+	setDefaults()
 
 	var appConfig AppConfig
-	err = viper.Unmarshal(&appConfig)
+	err := viper.Unmarshal(&appConfig)
 	if err != nil {
 		panic(fmt.Errorf("fatal error unmarshalling config: %w", err))
 	}
 
 	return &appConfig
+}
+
+func bindEnvVariables() {
+	_ = viper.BindEnv("PORT")
+	_ = viper.BindEnv("POSTGRES_USERNAME")
+	_ = viper.BindEnv("POSTGRES_PASSWORD")
+	_ = viper.BindEnv("POSTGRES_DATABASE")
+	_ = viper.BindEnv("POSTGRES_SSLMODE")
+	_ = viper.BindEnv("POSTGRES_HOST")
+	_ = viper.BindEnv("POSTGRES_PORT")
+	_ = viper.BindEnv("RABBITMQ_URL")
+	_ = viper.BindEnv("SERVICE_NAME")
+}
+
+func setDefaults() {
+	viper.SetDefault("PORT", "8080")
+	viper.SetDefault("POSTGRES_SSLMODE", "disable")
+	viper.SetDefault("POSTGRES_HOST", "localhost")
+	viper.SetDefault("POSTGRES_PORT", "5432")
+	viper.SetDefault("SERVICE_NAME", "auction")
 }

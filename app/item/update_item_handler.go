@@ -2,6 +2,7 @@ package item
 
 import (
 	"auction/domain"
+	"auction/pkg/events"
 	"auction/pkg/httperror"
 	"context"
 	"database/sql"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 type UpdateItemHandler struct {
-	repository Repository
+	repository     Repository
+	eventPublisher events.Publisher
 }
 
 type UpdateItemRequest struct {
@@ -33,9 +36,10 @@ type UpdateItemResponse struct {
 	Item domain.Item `json:"item"`
 }
 
-func NewUpdateItemHandler(repository Repository) *UpdateItemHandler {
+func NewUpdateItemHandler(repository Repository, eventPublisher events.Publisher) *UpdateItemHandler {
 	return &UpdateItemHandler{
-		repository: repository,
+		repository:     repository,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -114,7 +118,50 @@ func (e UpdateItemHandler) Handle(ctx context.Context, req *UpdateItemRequest) (
 		)
 	}
 
+	e.publishEvent(ctx, item)
+
 	return &UpdateItemResponse{
 		Item: item,
 	}, nil
+}
+
+func (e UpdateItemHandler) publishEvent(ctx context.Context, item domain.Item) {
+	if e.eventPublisher != nil {
+		eventPayload := events.ItemUpdatedPayload{
+			ID:           item.ID,
+			Name:         item.Name,
+			Description:  item.Description,
+			CurrencyCode: item.CurrencyCode,
+			StartPrice:   item.StartPrice,
+			CurrentPrice: item.CurrentPrice,
+			BidIncrement: item.BidIncrement,
+			ReservePrice: item.ReservePrice,
+			BuyoutPrice:  item.BuyoutPrice,
+			EndPrice:     item.EndPrice,
+			StartDate:    item.StartDate,
+			EndDate:      item.EndDate,
+			Status:       item.Status,
+			UpdatedAt:    item.UpdatedAt,
+		}
+
+		headers := events.Headers{
+			TraceID:       events.GenerateTraceID(),
+			CorrelationID: events.GenerateCorrelationID(),
+			Service:       "auction",
+		}
+
+		event := events.NewEvent(
+			events.ItemUpdatedEvent,
+			events.EventVersionV1,
+			eventPayload,
+			headers,
+		)
+
+		if err := e.eventPublisher.Publish(ctx, events.ItemExchange, event, headers); err != nil {
+			zap.L().Error("Failed to publish item.updated event",
+				zap.String("itemId", item.ID),
+				zap.Error(err),
+			)
+		}
+	}
 }

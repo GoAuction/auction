@@ -2,16 +2,19 @@ package item
 
 import (
 	"auction/domain"
+	"auction/pkg/events"
 	"auction/pkg/httperror"
 	"context"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 type CreateItemHandler struct {
-	repository Repository
+	repository     Repository
+	eventPublisher events.Publisher
 }
 
 type CreateItemRequest struct {
@@ -33,9 +36,10 @@ type CreateItemResponse struct {
 	Item domain.Item `json:"item"`
 }
 
-func NewCreateItemHandler(repository Repository) *CreateItemHandler {
+func NewCreateItemHandler(repository Repository, eventPublisher events.Publisher) *CreateItemHandler {
 	return &CreateItemHandler{
-		repository: repository,
+		repository:     repository,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -70,7 +74,50 @@ func (e CreateItemHandler) Handle(ctx context.Context, req *CreateItemRequest) (
 		)
 	}
 
+	e.publishEvent(ctx, item)
+
 	return &CreateItemResponse{
 		Item: item,
 	}, nil
+}
+
+func (e CreateItemHandler) publishEvent(ctx context.Context, item domain.Item) {
+	if e.eventPublisher != nil {
+		eventPayload := events.ItemCreatedPayload{
+			ID:           item.ID,
+			Name:         item.Name,
+			Description:  item.Description,
+			SellerID:     item.SellerID,
+			CurrencyCode: item.CurrencyCode,
+			StartPrice:   item.StartPrice,
+			CurrentPrice: item.CurrentPrice,
+			BidIncrement: item.BidIncrement,
+			ReservePrice: item.ReservePrice,
+			BuyoutPrice:  item.BuyoutPrice,
+			StartDate:    item.StartDate,
+			EndDate:      item.EndDate,
+			Status:       item.Status,
+			CreatedAt:    item.CreatedAt,
+		}
+
+		headers := events.Headers{
+			TraceID:       events.GenerateTraceID(),
+			CorrelationID: events.GenerateCorrelationID(),
+			Service:       "auction",
+		}
+
+		event := events.NewEvent(
+			events.ItemCreatedEvent,
+			events.EventVersionV1,
+			eventPayload,
+			headers,
+		)
+
+		if err := e.eventPublisher.Publish(ctx, events.ItemExchange, event, headers); err != nil {
+			zap.L().Error("Failed to publish item.created event",
+				zap.String("itemId", item.ID),
+				zap.Error(err),
+			)
+		}
+	}
 }
