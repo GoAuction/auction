@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS items (
     -- Satıcı: Identity servisindeki user id
     seller_id UUID NOT NULL,
 
+    -- Alıcı: Identity servisindeki user id
+    buyer_id UUID,
+
     -- Para birimi
     currency_code CHAR(3) NOT NULL DEFAULT 'TRY'
         CHECK (char_length(currency_code) = 3),

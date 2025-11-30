@@ -5,6 +5,7 @@ import (
 	"auction/domain"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -20,11 +21,34 @@ func NewPgRepository(host, database, user, password, port string) *PgRepository 
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		host, port, user, password, database,
 	))
+
+	// Connection pool configuration
+	// With 3 replicas × 15 conns = 45 total connections (safer for default PG max_connections=100)
+	db.SetMaxOpenConns(15)                 // Max concurrent DB connections per instance
+	db.SetMaxIdleConns(8)                  // Keep 8 idle connections in pool
+	db.SetConnMaxLifetime(5 * time.Minute) // Recycle connections every 5 min
+	db.SetConnMaxIdleTime(2 * time.Minute) // Close idle connections after 2 min
+
 	return &PgRepository{db: db}
 }
 
 func (r *PgRepository) Close() error {
 	return r.db.Close()
+}
+
+// GetPoolStats returns current connection pool statistics
+func (r *PgRepository) GetPoolStats() map[string]interface{} {
+	stats := r.db.Stats()
+	return map[string]interface{}{
+		"max_open_connections": stats.MaxOpenConnections,
+		"open_connections":     stats.OpenConnections,
+		"in_use":               stats.InUse,
+		"idle":                 stats.Idle,
+		"wait_count":           stats.WaitCount,          // How many times waited for connection
+		"wait_duration_ms":     stats.WaitDuration.Milliseconds(), // Total time spent waiting
+		"max_idle_closed":      stats.MaxIdleClosed,      // Connections closed due to idle
+		"max_lifetime_closed":  stats.MaxLifetimeClosed,  // Connections closed due to max lifetime
+	}
 }
 
 func (r *PgRepository) Create(ctx context.Context, req *item.CreateItemRequest) (domain.Item, error) {
@@ -113,7 +137,7 @@ func (r *PgRepository) DeleteItem(ctx context.Context, id string, userId string)
 	return err
 }
 
-func (r *PgRepository) Update(ctx context.Context, item domain.Item, userId string) error {
+func (r *PgRepository) UpdateUserItem(ctx context.Context, item domain.Item, userId string) error {
 	query := `
 		UPDATE items SET
 			name = :name,
@@ -128,9 +152,31 @@ func (r *PgRepository) Update(ctx context.Context, item domain.Item, userId stri
 			start_date = :start_date,
 			end_date = :end_date,
 			status = :status
-		WHERE id = :id AND seller_id = :seller_id`
+		WHERE id = $1 AND seller_id = $2`
 
-	_, err := r.db.NamedExecContext(ctx, query, item)
+	_, err := r.db.ExecContext(ctx, query, item.ID, userId)
+
+	return err
+}
+
+func (r *PgRepository) Update(ctx context.Context, item domain.Item) error {
+	query := `
+		UPDATE items SET
+			name = :name,
+			description = :description,
+			seller_id = :seller_id,
+			currency_code = :currency_code,
+			start_price = :start_price,
+			bid_increment = :bid_increment,
+			reserve_price = :reserve_price,
+			buyout_price = :buyout_price,
+			end_price = :end_price,
+			start_date = :start_date,
+			end_date = :end_date,
+			status = :status
+		WHERE id = :id`
+
+	_, err := r.db.ExecContext(ctx, query, item.ID)
 
 	return err
 }

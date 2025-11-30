@@ -1,7 +1,8 @@
 name: auction-auction
 
 services:
-  auction-dev:
+  # API Service (HTTP Server + Publisher)
+  auction-api-dev:
     profiles: ["dev"]
     build:
       context: .
@@ -9,6 +10,7 @@ services:
       target: dev
     env_file:
       - .env
+    command: air -c .air.toml -- cmd/api/main.go
     depends_on:
       auction-postgres:
         condition: service_healthy
@@ -22,10 +24,11 @@ services:
       - auction-internal
       - rabbitmq-shared
 
-  auction:
+  auction-api:
     build:
       context: .
       dockerfile: Dockerfile
+      target: api
     env_file:
       - .env
     depends_on:
@@ -33,6 +36,46 @@ services:
         condition: service_healthy
     ports:
       - "${HOST_PORT:-8081}:${PORT:-8080}"
+    restart: unless-stopped
+    networks:
+      - auction-internal
+      - rabbitmq-shared
+
+  # Worker Service (Event Consumer)
+  auction-worker-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - .env
+    deploy:
+      replicas: 3
+    command: go run cmd/worker/main.go
+    depends_on:
+      auction-postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - auction-go-mod:/go/pkg/mod
+    restart: unless-stopped
+    networks:
+      - auction-internal
+      - rabbitmq-shared
+
+  auction-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    env_file:
+      - .env
+    deploy:
+      replicas: 3
+    depends_on:
+      auction-postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - auction-internal

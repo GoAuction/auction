@@ -1,11 +1,11 @@
-# Air configuration for local development
+# Air configuration for local development (API Service)
 root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/auction ./main.go"
-bin = "./tmp/auction"
-full_bin = "./tmp/auction"
+cmd = "go build -o ./tmp/auction-api ./cmd/api/main.go"
+bin = "./tmp/auction-api"
+full_bin = "./tmp/auction-api"
 include_ext = ["go", "mod", "sum", "yaml"]
 exclude_dir = ["tmp", "vendor"]
 

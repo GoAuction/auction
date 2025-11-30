@@ -16,19 +16,21 @@ type EventHandler func(ctx context.Context, event *events.Event) error
 
 // Consumer represents a RabbitMQ consumer
 type Consumer struct {
-	conn        *amqp.Connection
-	channel     *amqp.Channel
-	queueName   string
-	serviceName string
+	conn           *amqp.Connection
+	channel        *amqp.Channel
+	queueName      string
+	serviceName    string
+	workerPoolSize int // Number of concurrent workers
 }
 
 // ConsumerConfig holds configuration for setting up a consumer
 type ConsumerConfig struct {
-	Exchange     string   // e.g., "auction.item"
-	QueueName    string   // e.g., "payment.item.created.v1"
-	RoutingKeys  []string // e.g., ["item.created.v1"]
-	ServiceName  string   // e.g., "payment"
-	PrefetchCount int     // Number of messages to prefetch (0 = unlimited)
+	Exchange       string   // e.g., "auction.item"
+	QueueName      string   // e.g., "payment.item.created.v1"
+	RoutingKeys    []string // e.g., ["item.created.v1"]
+	ServiceName    string   // e.g., "payment"
+	PrefetchCount  int      // Number of messages to prefetch (0 = unlimited)
+	WorkerPoolSize int      // Number of concurrent workers (0 = default 5)
 }
 
 // NewConsumer creates a new RabbitMQ consumer
@@ -164,17 +166,25 @@ func NewConsumer(url string, config ConsumerConfig) (*Consumer, error) {
 		}
 	}
 
+	// Set worker pool size
+	workerPoolSize := config.WorkerPoolSize
+	if workerPoolSize == 0 {
+		workerPoolSize = 5 // Default concurrent workers
+	}
+
 	zap.L().Info("RabbitMQ consumer created successfully",
 		zap.String("queue", config.QueueName),
 		zap.String("exchange", config.Exchange),
 		zap.Strings("routingKeys", config.RoutingKeys),
+		zap.Int("workerPoolSize", workerPoolSize),
 	)
 
 	return &Consumer{
-		conn:        conn,
-		channel:     channel,
-		queueName:   config.QueueName,
-		serviceName: config.ServiceName,
+		conn:           conn,
+		channel:        channel,
+		queueName:      config.QueueName,
+		serviceName:    config.ServiceName,
+		workerPoolSize: workerPoolSize,
 	}, nil
 }
 
@@ -193,7 +203,14 @@ func (c *Consumer) Consume(ctx context.Context, handler EventHandler) error {
 		return fmt.Errorf("failed to register consumer: %w", err)
 	}
 
-	zap.L().Info("Started consuming messages", zap.String("queue", c.queueName))
+	zap.L().Info("Started consuming messages",
+		zap.String("queue", c.queueName),
+		zap.Int("workerPoolSize", c.workerPoolSize),
+	)
+
+	// Create semaphore channel for worker pool
+	// This limits the number of concurrent goroutines
+	semaphore := make(chan struct{}, c.workerPoolSize)
 
 	for {
 		select {
@@ -206,7 +223,14 @@ func (c *Consumer) Consume(ctx context.Context, handler EventHandler) error {
 				return fmt.Errorf("message channel closed")
 			}
 
-			c.handleMessage(ctx, msg, handler)
+			// Acquire semaphore slot (blocks if pool is full)
+			semaphore <- struct{}{}
+
+			// Process message in goroutine
+			go func(m amqp.Delivery) {
+				defer func() { <-semaphore }() // Release semaphore slot
+				c.handleMessage(ctx, m, handler)
+			}(msg)
 		}
 	}
 }

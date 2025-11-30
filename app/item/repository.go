@@ -13,5 +13,6 @@ type Repository interface {
 	DeleteItem(ctx context.Context, id string, userID string) error
 	CountItems(ctx context.Context) (int, error)
 	Create(ctx context.Context, req *CreateItemRequest) (domain.Item, error)
-	Update(ctx context.Context, item domain.Item, userID string) error
+	UpdateUserItem(ctx context.Context, item domain.Item, userID string) error
+	Update(ctx context.Context, item domain.Item) error
 }

@@ -11,6 +11,7 @@ type Item struct {
 	Name         string  `db:"name" json:"name"`
 	Description  *string `db:"description" json:"description"`
 	SellerID     string  `db:"seller_id" json:"sellerID"`
+	BuyerID      string  `db:"buyer_id" json:"buyerID"`
 	CurrencyCode string  `db:"currency_code" json:"currencyCode"`
 
 	StartPrice   decimal.Decimal  `db:"start_price" json:"startPrice"`

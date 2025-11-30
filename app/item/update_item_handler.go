@@ -109,7 +109,7 @@ func (e UpdateItemHandler) Handle(ctx context.Context, req *UpdateItemRequest) (
 		item.Status = *req.Status
 	}
 
-	err = e.repository.Update(ctx, item, userID)
+	err = e.repository.UpdateUserItem(ctx, item, userID)
 	if err != nil {
 		return nil, httperror.InternalServerError(
 			"item.update.update_failed",
