@@ -44,10 +44,10 @@ func (r *PgRepository) GetPoolStats() map[string]interface{} {
 		"open_connections":     stats.OpenConnections,
 		"in_use":               stats.InUse,
 		"idle":                 stats.Idle,
-		"wait_count":           stats.WaitCount,          // How many times waited for connection
+		"wait_count":           stats.WaitCount,                   // How many times waited for connection
 		"wait_duration_ms":     stats.WaitDuration.Milliseconds(), // Total time spent waiting
-		"max_idle_closed":      stats.MaxIdleClosed,      // Connections closed due to idle
-		"max_lifetime_closed":  stats.MaxLifetimeClosed,  // Connections closed due to max lifetime
+		"max_idle_closed":      stats.MaxIdleClosed,               // Connections closed due to idle
+		"max_lifetime_closed":  stats.MaxLifetimeClosed,           // Connections closed due to max lifetime
 	}
 }
 
@@ -137,46 +137,83 @@ func (r *PgRepository) DeleteItem(ctx context.Context, id string, userId string)
 	return err
 }
 
+// sqlx ile NamedExecContext kullanarak
 func (r *PgRepository) UpdateUserItem(ctx context.Context, item domain.Item, userId string) error {
 	query := `
-		UPDATE items SET
-			name = :name,
-			description = :description,
-			seller_id = :seller_id,
-			currency_code = :currency_code,
-			start_price = :start_price,
-			bid_increment = :bid_increment,
-			reserve_price = :reserve_price,
-			buyout_price = :buyout_price,
-			end_price = :end_price,
-			start_date = :start_date,
-			end_date = :end_date,
-			status = :status
-		WHERE id = $1 AND seller_id = $2`
+        UPDATE items SET
+            name = :name,
+            description = :description,
+            seller_id = :seller_id,
+            currency_code = :currency_code,
+            start_price = :start_price,
+            bid_increment = :bid_increment,
+            reserve_price = :reserve_price,
+            buyout_price = :buyout_price,
+            end_price = :end_price,
+            start_date = :start_date,
+            end_date = :end_date,
+            status = :status
+        WHERE id = :id AND seller_id = :seller_id_filter
+    `
 
-	_, err := r.db.ExecContext(ctx, query, item.ID, userId)
+	// named param map: item alanları + seller_id_filter (WHERE için)
+	params := map[string]interface{}{
+		"id":               item.ID,
+		"name":             item.Name,
+		"description":      item.Description,
+		"seller_id":        item.SellerID,
+		"currency_code":    item.CurrencyCode,
+		"start_price":      item.StartPrice,
+		"bid_increment":    item.BidIncrement,
+		"reserve_price":    item.ReservePrice,
+		"buyout_price":     item.BuyoutPrice,
+		"end_price":        item.EndPrice,
+		"start_date":       item.StartDate,
+		"end_date":         item.EndDate,
+		"status":           item.Status,
+		"seller_id_filter": userId,
+	}
 
+	_, err := r.db.NamedExecContext(ctx, query, params)
 	return err
 }
 
 func (r *PgRepository) Update(ctx context.Context, item domain.Item) error {
 	query := `
-		UPDATE items SET
-			name = :name,
-			description = :description,
-			seller_id = :seller_id,
-			currency_code = :currency_code,
-			start_price = :start_price,
-			bid_increment = :bid_increment,
-			reserve_price = :reserve_price,
-			buyout_price = :buyout_price,
-			end_price = :end_price,
-			start_date = :start_date,
-			end_date = :end_date,
-			status = :status
-		WHERE id = :id`
+        UPDATE items SET
+            name = :name,
+            description = :description,
+            seller_id = :seller_id,
+            currency_code = :currency_code,
+            current_price = :current_price,
+            start_price = :start_price,
+            bid_increment = :bid_increment,
+            reserve_price = :reserve_price,
+            buyout_price = :buyout_price,
+            end_price = :end_price,
+            start_date = :start_date,
+            end_date = :end_date,
+            status = :status
+        WHERE id = :id
+    `
 
-	_, err := r.db.ExecContext(ctx, query, item.ID)
+	params := map[string]interface{}{
+		"id":            item.ID,
+		"name":          item.Name,
+		"description":   item.Description,
+		"seller_id":     item.SellerID,
+		"currency_code": item.CurrencyCode,
+		"current_price": item.CurrentPrice,
+		"start_price":   item.StartPrice,
+		"bid_increment": item.BidIncrement,
+		"reserve_price": item.ReservePrice,
+		"buyout_price":  item.BuyoutPrice,
+		"end_price":     item.EndPrice,
+		"start_date":    item.StartDate,
+		"end_date":      item.EndDate,
+		"status":        item.Status,
+	}
 
+	_, err := r.db.NamedExecContext(ctx, query, params)
 	return err
 }

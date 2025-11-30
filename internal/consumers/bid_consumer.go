@@ -54,11 +54,6 @@ func (h *BidEventHandler) handleBidPlaced(ctx context.Context, event *events.Eve
 		return fmt.Errorf("malformed payload - unmarshal failed: %w", err)
 	}
 
-	// TODO: Validate required fields
-	// Bu kısımda required field'ların kontrolünü siz implement edin
-	// itemId, amount gibi alanların var olduğunu ve doğru tipte olduğunu kontrol edin
-	// Eğer malformed ise error dönün, consumer otomatik NACK yapıp DLQ'ya gönderecek
-
 	itemID, ok := payload["itemId"].(string)
 	if !ok || itemID == "" {
 		return fmt.Errorf("malformed payload - itemId missing or invalid")
