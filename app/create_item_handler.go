@@ -1,4 +1,4 @@
-package item
+package app
 
 import (
 	"auction/domain"
@@ -30,6 +30,7 @@ type CreateItemRequest struct {
 	StartDate    time.Time        `json:"startDate" validate:"required" db:"start_date"`
 	EndDate      time.Time        `json:"endDate" validate:"required,gtfield=StartDate" db:"end_date"`
 	Status       string           `json:"status,omitempty" validate:"required,oneof=draft active sold cancelled" db:"status"`
+	CategoryIDs  []string         `json:"categoryIds,omitempty"`
 }
 
 type CreateItemResponse struct {
@@ -70,7 +71,9 @@ func (e CreateItemHandler) Handle(ctx context.Context, req *CreateItemRequest) (
 		return nil, httperror.InternalServerError(
 			"item.create.create_failed",
 			"An error occurred while creating the item",
-			nil,
+			[]string{
+				err.Error(),
+			},
 		)
 	}
 

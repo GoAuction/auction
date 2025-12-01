@@ -1,4 +1,4 @@
-package item
+package app
 
 import (
 	"auction/domain"

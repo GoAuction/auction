@@ -1,9 +1,11 @@
 package postgres
 
 import (
-	"auction/app/item"
+	"auction/app"
 	"auction/domain"
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -37,9 +39,9 @@ func (r *PgRepository) Close() error {
 }
 
 // GetPoolStats returns current connection pool statistics
-func (r *PgRepository) GetPoolStats() map[string]interface{} {
+func (r *PgRepository) GetPoolStats() map[string]any {
 	stats := r.db.Stats()
-	return map[string]interface{}{
+	return map[string]any{
 		"max_open_connections": stats.MaxOpenConnections,
 		"open_connections":     stats.OpenConnections,
 		"in_use":               stats.InUse,
@@ -51,8 +53,16 @@ func (r *PgRepository) GetPoolStats() map[string]interface{} {
 	}
 }
 
-func (r *PgRepository) Create(ctx context.Context, req *item.CreateItemRequest) (domain.Item, error) {
-	var i domain.Item
+func (r *PgRepository) Create(ctx context.Context, req *app.CreateItemRequest) (domain.Item, error) {
+	// Start transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return domain.Item{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Will be no-op if transaction is committed
+
+	// Insert item using positional parameters
+	var itemID string
 	query := `
 		INSERT INTO items (
 			name, description, seller_id, currency_code,
@@ -60,35 +70,116 @@ func (r *PgRepository) Create(ctx context.Context, req *item.CreateItemRequest) 
 			buyout_price, end_price, start_date, end_date,
 			status
 		) VALUES (
-			:name, :description, :seller_id, :currency_code,
-			:start_price, :bid_increment, :reserve_price,
-			:buyout_price, :end_price, :start_date, :end_date,
-			:status
-		) RETURNING *`
+			$1, $2, $3, $4,
+			$5, $6, $7,
+			$8, $9, $10, $11,
+			$12
+		) RETURNING id`
 
-	rows, err := r.db.NamedQueryContext(ctx, query, req)
+	err = tx.QueryRowContext(ctx, query,
+		req.Name,
+		req.Description,
+		req.SellerID,
+		req.CurrencyCode,
+		req.StartPrice,
+		req.BidIncrement,
+		req.ReservePrice,
+		req.BuyoutPrice,
+		req.EndPrice,
+		req.StartDate,
+		req.EndDate,
+		req.Status,
+	).Scan(&itemID)
+
 	if err != nil {
-		return i, err
+		return domain.Item{}, fmt.Errorf("failed to insert item: %w", err)
 	}
-	defer rows.Close()
 
-	if rows.Next() {
-		err = rows.StructScan(&i)
+	// Insert item categories if provided
+	if len(req.CategoryIDs) > 0 {
+		categoryQuery := `INSERT INTO item_categories (item_id, category_id) VALUES ($1, $2)`
+		for _, categoryID := range req.CategoryIDs {
+			if _, err := tx.ExecContext(ctx, categoryQuery, itemID, categoryID); err != nil {
+				return domain.Item{}, fmt.Errorf("failed to insert item category: %w", err)
+			}
+		}
 	}
-	return i, err
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return domain.Item{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Fetch and return the complete item with categories
+	return r.GetItem(ctx, itemID)
 }
 
 func (r *PgRepository) GetItems(ctx context.Context, limit, offset int) ([]domain.Item, error) {
-	items := make([]domain.Item, 0)
-	query := `SELECT * FROM items ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	// Temporary struct to hold the query result with JSON categories
+	type itemWithCategories struct {
+		domain.Item
+		CategoriesJSON sql.NullString `db:"categories"`
+	}
 
-	err := r.db.SelectContext(ctx, &items, query, limit, offset)
+	query := `
+		SELECT
+			items.*,
+			COALESCE(
+				json_agg(
+					json_build_object(
+						'id', categories.id,
+						'name', categories.name,
+						'description', categories.description,
+						'parent_id', categories.parent_id,
+						'status', categories.status,
+						'created_at', categories.created_at,
+						'updated_at', categories.updated_at
+					)
+				) FILTER (WHERE categories.id IS NOT NULL),
+				'[]'
+			) as categories
+		FROM items
+		LEFT JOIN item_categories ON items.id = item_categories.item_id
+		LEFT JOIN categories ON item_categories.category_id = categories.id
+		GROUP BY items.id
+		ORDER BY items.created_at DESC
+		LIMIT $1 OFFSET $2`
+
+	var tempItems []itemWithCategories
+	err := r.db.SelectContext(ctx, &tempItems, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to final Item slice with unmarshaled categories
+	items := make([]domain.Item, len(tempItems))
+	for i, temp := range tempItems {
+		items[i] = temp.Item
+
+		// Unmarshal categories JSON if present
+		if temp.CategoriesJSON.Valid && temp.CategoriesJSON.String != "[]" {
+			if err := json.Unmarshal([]byte(temp.CategoriesJSON.String), &items[i].Categories); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal categories: %w", err)
+			}
+		} else {
+			items[i].Categories = []domain.Category{}
+		}
+	}
+
+	return items, nil
+}
+
+func (r *PgRepository) GetCategories(ctx context.Context, limit, offset int) ([]domain.Category, error) {
+	categories := make([]domain.Category, 0)
+	query := `SELECT * FROM categories ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+
+	err := r.db.SelectContext(ctx, &categories, query, limit, offset)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return items, nil
+	return categories, nil
 }
 
 func (r *PgRepository) CountItems(ctx context.Context) (int, error) {
@@ -103,30 +194,116 @@ func (r *PgRepository) CountItems(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (r *PgRepository) GetItem(ctx context.Context, id string) (domain.Item, error) {
-	var i domain.Item
-	query := `SELECT * FROM items WHERE id = $1`
+func (r *PgRepository) CountCategories(ctx context.Context) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM categories`
 
-	err := r.db.GetContext(ctx, &i, query, id)
-
+	err := r.db.GetContext(ctx, &count, query)
 	if err != nil {
-		return i, err
+		return 0, err
 	}
 
-	return i, nil
+	return count, nil
+}
+
+func (r *PgRepository) GetItem(ctx context.Context, id string) (domain.Item, error) {
+	// Temporary struct to hold the query result with JSON categories
+	type itemWithCategories struct {
+		domain.Item
+		CategoriesJSON sql.NullString `db:"categories"`
+	}
+
+	query := `
+		SELECT
+			items.*,
+			COALESCE(
+				json_agg(
+					json_build_object(
+						'id', categories.id,
+						'name', categories.name,
+						'description', categories.description,
+						'parent_id', categories.parent_id,
+						'status', categories.status,
+						'created_at', categories.created_at,
+						'updated_at', categories.updated_at
+					)
+				) FILTER (WHERE categories.id IS NOT NULL),
+				'[]'
+			) as categories
+		FROM items
+		LEFT JOIN item_categories ON items.id = item_categories.item_id
+		LEFT JOIN categories ON item_categories.category_id = categories.id
+		WHERE items.id = $1
+		GROUP BY items.id`
+
+	var temp itemWithCategories
+	err := r.db.GetContext(ctx, &temp, query, id)
+	if err != nil {
+		return domain.Item{}, err
+	}
+
+	item := temp.Item
+
+	// Unmarshal categories JSON if present
+	if temp.CategoriesJSON.Valid && temp.CategoriesJSON.String != "[]" {
+		if err := json.Unmarshal([]byte(temp.CategoriesJSON.String), &item.Categories); err != nil {
+			return domain.Item{}, fmt.Errorf("failed to unmarshal categories: %w", err)
+		}
+	} else {
+		item.Categories = []domain.Category{}
+	}
+
+	return item, nil
 }
 
 func (r *PgRepository) GetUserItem(ctx context.Context, id string, userId string) (domain.Item, error) {
-	var i domain.Item
-	query := `SELECT * FROM items WHERE id = $1 AND seller_id = $2`
-
-	err := r.db.GetContext(ctx, &i, query, id, userId)
-
-	if err != nil {
-		return i, err
+	// Temporary struct to hold the query result with JSON categories
+	type itemWithCategories struct {
+		domain.Item
+		CategoriesJSON sql.NullString `db:"categories"`
 	}
 
-	return i, nil
+	query := `
+		SELECT
+			items.*,
+			COALESCE(
+				json_agg(
+					json_build_object(
+						'id', categories.id,
+						'name', categories.name,
+						'description', categories.description,
+						'parent_id', categories.parent_id,
+						'status', categories.status,
+						'created_at', categories.created_at,
+						'updated_at', categories.updated_at
+					)
+				) FILTER (WHERE categories.id IS NOT NULL),
+				'[]'
+			) as categories
+		FROM items
+		LEFT JOIN item_categories ON items.id = item_categories.item_id
+		LEFT JOIN categories ON item_categories.category_id = categories.id
+		WHERE items.id = $1 AND items.seller_id = $2
+		GROUP BY items.id`
+
+	var temp itemWithCategories
+	err := r.db.GetContext(ctx, &temp, query, id, userId)
+	if err != nil {
+		return domain.Item{}, err
+	}
+
+	item := temp.Item
+
+	// Unmarshal categories JSON if present
+	if temp.CategoriesJSON.Valid && temp.CategoriesJSON.String != "[]" {
+		if err := json.Unmarshal([]byte(temp.CategoriesJSON.String), &item.Categories); err != nil {
+			return domain.Item{}, fmt.Errorf("failed to unmarshal categories: %w", err)
+		}
+	} else {
+		item.Categories = []domain.Category{}
+	}
+
+	return item, nil
 }
 
 func (r *PgRepository) DeleteItem(ctx context.Context, id string, userId string) error {
@@ -137,7 +314,6 @@ func (r *PgRepository) DeleteItem(ctx context.Context, id string, userId string)
 	return err
 }
 
-// sqlx ile NamedExecContext kullanarak
 func (r *PgRepository) UpdateUserItem(ctx context.Context, item domain.Item, userId string) error {
 	query := `
         UPDATE items SET
@@ -216,4 +392,26 @@ func (r *PgRepository) Update(ctx context.Context, item domain.Item) error {
 
 	_, err := r.db.NamedExecContext(ctx, query, params)
 	return err
+}
+
+func (r *PgRepository) GetCategoryByID(ctx context.Context, id string) (domain.Category, error) {
+	var category domain.Category
+
+	err := r.db.GetContext(ctx, &category, "SELECT * FROM categories WHERE id = $1", id)
+	if err != nil {
+		return category, err
+	}
+
+	return category, nil
+}
+
+func (r *PgRepository) GetCategoriesByItemID(ctx context.Context, itemId string) ([]domain.Category, error) {
+	categories := make([]domain.Category, 0)
+
+	err := r.db.SelectContext(ctx, &categories, "SELECT * FROM categories WHERE id IN (SELECT category_id FROM item_categories WHERE item_id = $1)", itemId)
+	if err != nil {
+		return categories, err
+	}
+
+	return categories, nil
 }

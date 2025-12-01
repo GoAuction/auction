@@ -1,7 +1,7 @@
 package main
 
 import (
-	"auction/app/item"
+	auctionApp "auction/app"
 	"auction/infra/postgres"
 	"auction/infra/rabbitmq"
 	"auction/internal/middleware"
@@ -109,22 +109,26 @@ func main() {
 		}
 	}
 
-	createItemHadler := item.NewCreateItemHandler(pgRepository, eventPublisher)
-	getItemsHandler := item.NewGetItemsHandler(pgRepository)
-	getItemHandler := item.NewGetItemHandler(pgRepository)
-	deleteItemHandler := item.NewDeleteItemHandler(pgRepository, eventPublisher)
-	updateItemHandler := item.NewUpdateItemHandler(pgRepository, eventPublisher)
+	createItemHadler := auctionApp.NewCreateItemHandler(pgRepository, eventPublisher)
+	getItemsHandler := auctionApp.NewGetItemsHandler(pgRepository)
+	getItemHandler := auctionApp.NewGetItemHandler(pgRepository)
+	deleteItemHandler := auctionApp.NewDeleteItemHandler(pgRepository, eventPublisher)
+	updateItemHandler := auctionApp.NewUpdateItemHandler(pgRepository, eventPublisher)
+	getCategoriesHandler := auctionApp.NewGetCategoriesHandler(pgRepository)
+	getCategoryHandler := auctionApp.NewGetCategoryHandler(pgRepository)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
 	publicRoutes := app.Group("/api/v1")
-	publicRoutes.Get("/items", handle[item.GetItemsRequest, item.GetItemsResponse](getItemsHandler))
-	publicRoutes.Get("/items/:id", handle[item.GetItemRequest, item.GetItemResponse](getItemHandler))
+	publicRoutes.Get("/items", handle[auctionApp.GetItemsRequest, auctionApp.GetItemsResponse](getItemsHandler))
+	publicRoutes.Get("/items/:id", handle[auctionApp.GetItemRequest, auctionApp.GetItemResponse](getItemHandler))
+	publicRoutes.Get("/categories", handle[auctionApp.GetCategoriesRequest, auctionApp.GetCategoriesResponse](getCategoriesHandler))
+	publicRoutes.Get("/categories/:id", handle[auctionApp.GetCategoryRequest, auctionApp.GetCategoryResponse](getCategoryHandler))
 
 	privateRoutes := app.Group("/api/v1", securityHeadersHandler)
-	privateRoutes.Post("/items", handle[item.CreateItemRequest, item.CreateItemResponse](createItemHadler))
-	privateRoutes.Put("/items/:id", handle[item.UpdateItemRequest, item.UpdateItemResponse](updateItemHandler))
-	privateRoutes.Delete("/items/:id", handle[item.DeleteItemRequest, item.DeleteItemResponse](deleteItemHandler))
+	privateRoutes.Post("/items", handle[auctionApp.CreateItemRequest, auctionApp.CreateItemResponse](createItemHadler))
+	privateRoutes.Put("/items/:id", handle[auctionApp.UpdateItemRequest, auctionApp.UpdateItemResponse](updateItemHandler))
+	privateRoutes.Delete("/items/:id", handle[auctionApp.DeleteItemRequest, auctionApp.DeleteItemResponse](deleteItemHandler))
 
 	// Start server in a goroutine
 	go func() {

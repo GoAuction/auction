@@ -1,24 +1,23 @@
 package consumers
 
 import (
+	"auction/app"
 	"auction/pkg/events"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"auction/app/item"
-
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 )
 
 type BidEventHandler struct {
-	repository item.Repository
+	repository app.Repository
 	logger     *zap.Logger
 }
 
-func NewBidEventHandler(repository item.Repository, logger *zap.Logger) *BidEventHandler {
+func NewBidEventHandler(repository app.Repository, logger *zap.Logger) *BidEventHandler {
 	return &BidEventHandler{
 		repository: repository,
 		logger:     logger,
@@ -128,7 +127,7 @@ func (h *BidEventHandler) handleBidWon(ctx context.Context, event *events.Event)
 	}
 
 	item.Status = "sold"
-	item.BuyerID = buyerID
+	item.BuyerID = &buyerID
 
 	finalPrice, err := decimal.NewFromString(finalAmount)
 	if err != nil {

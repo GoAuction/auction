@@ -1,4 +1,4 @@
-package item
+package app
 
 import (
 	"auction/domain"
@@ -30,15 +30,8 @@ type GetItemsResponse struct {
 }
 
 func (h GetItemsHandler) Handle(ctx context.Context, req *GetItemsRequest) (*GetItemsResponse, error) {
-	page := req.Page
-	if page < 1 {
-		page = 1
-	}
-
-	pageSize := req.PageSize
-	if pageSize < 1 {
-		pageSize = 10
-	}
+	page := max(req.Page, 1)
+	pageSize := max(req.PageSize, 10)
 
 	offset := (page - 1) * pageSize
 
