@@ -116,12 +116,16 @@ func main() {
 	updateItemHandler := auctionApp.NewUpdateItemHandler(pgRepository, eventPublisher)
 	getCategoriesHandler := auctionApp.NewGetCategoriesHandler(pgRepository)
 	getCategoryHandler := auctionApp.NewGetCategoryHandler(pgRepository)
+	getCommentsHandler := auctionApp.NewGetCommentsHandler(pgRepository)
+	createCommentHandler := auctionApp.NewCreateCommentHandler(pgRepository, eventPublisher)
+	deleteCommentHandler := auctionApp.NewDeleteCommentHandler(pgRepository, eventPublisher)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
 	publicRoutes := app.Group("/api/v1")
 	publicRoutes.Get("/items", handle[auctionApp.GetItemsRequest, auctionApp.GetItemsResponse](getItemsHandler))
 	publicRoutes.Get("/items/:id", handle[auctionApp.GetItemRequest, auctionApp.GetItemResponse](getItemHandler))
+	publicRoutes.Get("/items/:id/comments", handle[auctionApp.GetCommentsRequest, auctionApp.GetCommentsResponse](getCommentsHandler))
 	publicRoutes.Get("/categories", handle[auctionApp.GetCategoriesRequest, auctionApp.GetCategoriesResponse](getCategoriesHandler))
 	publicRoutes.Get("/categories/:id", handle[auctionApp.GetCategoryRequest, auctionApp.GetCategoryResponse](getCategoryHandler))
 
@@ -129,6 +133,8 @@ func main() {
 	privateRoutes.Post("/items", handle[auctionApp.CreateItemRequest, auctionApp.CreateItemResponse](createItemHadler))
 	privateRoutes.Put("/items/:id", handle[auctionApp.UpdateItemRequest, auctionApp.UpdateItemResponse](updateItemHandler))
 	privateRoutes.Delete("/items/:id", handle[auctionApp.DeleteItemRequest, auctionApp.DeleteItemResponse](deleteItemHandler))
+	privateRoutes.Post("/items/:id/comments", handle[auctionApp.CreateCommentRequest, auctionApp.CreateCommentResponse](createCommentHandler))
+	privateRoutes.Delete("/items/:itemId/comments/:commentId", handle[auctionApp.DeleteCommentRequest, auctionApp.DeleteCommentResponse](deleteCommentHandler))
 
 	// Start server in a goroutine
 	go func() {

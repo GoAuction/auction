@@ -61,10 +61,14 @@ func UnprocessableEntity(code, message string, details interface{}) *Error {
 	return New(http.StatusUnprocessableEntity, code, message, details)
 }
 
-func NoContent(code, message string, details interface {}) *Error {
+func NoContent(code, message string, details interface{}) *Error {
 	return New(http.StatusNoContent, code, message, details)
 }
 
-func Accepted(code, message string, details interface {}) *Error {
+func Accepted(code, message string, details interface{}) *Error {
 	return New(http.StatusAccepted, code, message, details)
+}
+
+func Forbidden(code, message string, details interface{}) *Error {
+	return New(http.StatusForbidden, code, message, details)
 }

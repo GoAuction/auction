@@ -19,4 +19,9 @@ type Repository interface {
 	Update(ctx context.Context, item domain.Item) error
 	GetCategoryByID(ctx context.Context, id string) (domain.Category, error)
 	GetCategoriesByItemID(ctx context.Context, itemID string) ([]domain.Category, error)
+	GetItemCommentsByItemID(ctx context.Context, itemID string, page, pageSize int) ([]domain.ItemComment, error)
+	CountItemComments(ctx context.Context, itemID string) (int, error)
+	CreateComment(ctx context.Context, itemID string, comment string, userID string, parentID *string) (domain.ItemComment, error)
+	DeleteComment(ctx context.Context, id string) error
+	GetCommentByID(ctx context.Context, id string) (domain.ItemComment, error)
 }

@@ -13,9 +13,6 @@ CREATE TABLE IF NOT EXISTS item_attributes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- Composite primary key (one item can have multiple attributes, but key must be unique per item)
-    PRIMARY KEY (item_id, key),
-
     -- Foreign key to items
     CONSTRAINT fk_item_attributes_item FOREIGN KEY (item_id)
         REFERENCES items(id) ON DELETE CASCADE

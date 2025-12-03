@@ -415,3 +415,71 @@ func (r *PgRepository) GetCategoriesByItemID(ctx context.Context, itemId string)
 
 	return categories, nil
 }
+
+func (r *PgRepository) GetItemCommentsByItemID(ctx context.Context, itemID string, page, pageSize int) ([]domain.ItemComment, error) {
+	comments := make([]domain.ItemComment, 0)
+
+	limit := pageSize
+	offset := (page - 1) * pageSize
+
+	fmt.Println("limit:", limit)
+	fmt.Println("offset:", offset)
+
+	err := r.db.SelectContext(ctx, &comments, "SELECT * FROM item_comments WHERE item_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3", itemID, limit, offset)
+	if err != nil {
+		return comments, err
+	}
+
+	return comments, nil
+}
+
+func (r *PgRepository) CountItemComments(ctx context.Context, itemID string) (int, error) {
+	var count int
+
+	err := r.db.GetContext(ctx, &count, "SELECT COUNT(*) FROM item_comments WHERE item_id = $1", itemID)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *PgRepository) CreateComment(ctx context.Context, itemID string, content string, userID string, parentID *string) (domain.ItemComment, error) {
+	query := `
+		INSERT INTO item_comments (item_id, content, user_id, parent_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, item_id, content, user_id, parent_id, created_at, updated_at
+	`
+
+	var comment domain.ItemComment
+	err := r.db.GetContext(ctx, &comment, query, itemID, content, userID, parentID)
+	if err != nil {
+		return domain.ItemComment{}, err
+	}
+
+	return comment, nil
+}
+
+func (r *PgRepository) DeleteComment(ctx context.Context, id string) error {
+	query := `
+		DELETE FROM item_comments WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PgRepository) GetCommentByID(ctx context.Context, id string) (domain.ItemComment, error) {
+	var comment domain.ItemComment
+
+	err := r.db.GetContext(ctx, &comment, "SELECT * FROM item_comments WHERE id = $1", id)
+	if err != nil {
+		return domain.ItemComment{}, err
+	}
+
+	return comment, nil
+}
