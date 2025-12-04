@@ -9,14 +9,17 @@ The auction service consists of two main components:
 ### 1. API Service (`cmd/api/`)
 **Role:** HTTP REST API + Event Publisher
 
-- Handles item CRUD operations
-- Publishes item events (created, updated, deleted) to RabbitMQ
+- Handles item and comment CRUD operations
+- Manages categories and item metadata (attributes, images)
+- Publishes domain events (items, comments) to RabbitMQ
 - Used by external clients and services
 
 **Events Published:**
 - `item.created.v1` → When a new item is created
 - `item.updated.v1` → When an item is updated
 - `item.deleted.v1` → When an item is deleted
+- `item.comment.created.v1` → When a comment is added to an item
+- `item.comment.deleted.v1` → When a comment is deleted from an item
 
 ### 2. Worker Service (`cmd/worker/`)
 **Role:** Event Consumer + Item State Manager
@@ -41,11 +44,27 @@ auction/
 │   └── worker/                 # Event Worker Service (Consumer)
 │       └── main.go
 │
-├── app/                        # Application layer
-│   └── item/                   # Item HTTP handlers
+├── app/                        # Application layer (HTTP handlers)
+│   ├── create_item_handler.go
+│   ├── get_items_handler.go
+│   ├── get_item_handler.go
+│   ├── update_item_handler.go
+│   ├── delete_item_handler.go
+│   ├── get_categories_handler.go
+│   ├── get_category_handler.go
+│   ├── get_comments_handler.go
+│   ├── create_comment_handler.go
+│   ├── delete_comment_handler.go
+│   ├── get_item_images_handler.go
+│   └── repository.go
 │
 ├── domain/                     # Domain entities
-│   └── item.go
+│   ├── item.go
+│   ├── category.go
+│   ├── item_category.go
+│   ├── item_attribute.go
+│   ├── item_comment.go
+│   └── item_image.go
 │
 ├── internal/
 │   ├── middleware/             # HTTP middlewares
@@ -55,6 +74,12 @@ auction/
 ├── infra/
 │   ├── postgres/               # Database layer
 │   │   ├── migrations/
+│   │   │   ├── 001_create_items.sql
+│   │   │   ├── 002_create_categories.sql
+│   │   │   ├── 003_create_item_categories.sql
+│   │   │   ├── 004_create_item_attributes.sql
+│   │   │   ├── 005_create_item_comments.sql
+│   │   │   └── 006_create_item_images.sql
 │   │   └── repository.go       # Connection pool tuning
 │   └── rabbitmq/               # Message broker
 │       ├── publisher.go        # Event publishing
@@ -237,17 +262,32 @@ go run cmd/worker/main.go
 
 ## API Endpoints
 
-### Public Endpoints
-- `GET /api/v1/items` - List all items
-- `GET /api/v1/items/:id` - Get item by ID
+### Public Endpoints (No Authentication Required)
+
+**Items:**
+- `GET /api/v1/items` - List all items with pagination and filtering
+- `GET /api/v1/items/:id` - Get item details by ID
+- `GET /api/v1/items/:id/comments` - Get all comments for an item
+- `GET /api/v1/items/:id/images` - Get all images for an item
+
+**Categories:**
+- `GET /api/v1/categories` - List all categories
+- `GET /api/v1/categories/:id` - Get category details by ID
 
 ### Private Endpoints (Require X-User-ID header)
-- `POST /api/v1/items` - Create new item
-- `PUT /api/v1/items/:id` - Update item
+
+**Items:**
+- `POST /api/v1/items` - Create new auction item
+- `PUT /api/v1/items/:id` - Update item details
 - `DELETE /api/v1/items/:id` - Delete item
 
-### Example: Create Item
+**Comments:**
+- `POST /api/v1/items/:id/comments` - Add comment to an item
+- `DELETE /api/v1/items/:itemId/comments/:commentId` - Delete a comment
 
+### API Examples
+
+#### Create Item
 ```bash
 curl -X POST http://localhost:8081/api/v1/items \
   -H "Content-Type: application/json" \
@@ -264,11 +304,37 @@ curl -X POST http://localhost:8081/api/v1/items \
   }'
 ```
 
+#### Get Items with Filtering
+```bash
+# List all active items
+curl -X GET "http://localhost:8081/api/v1/items?status=active"
+
+# Get items with pagination
+curl -X GET "http://localhost:8081/api/v1/items?page=1&limit=20"
+```
+
+#### Add Comment to Item
+```bash
+curl -X POST http://localhost:8081/api/v1/items/item-uuid/comments \
+  -H "Content-Type: application/json" \
+  -H "X-User-ID: user-123" \
+  -d '{
+    "content": "Is this item still available?"
+  }'
+```
+
+#### Get Categories
+```bash
+curl -X GET http://localhost:8081/api/v1/categories
+```
+
 ## Event Integration
 
 ### Publishing Events (API Service)
 
-When items are created/updated/deleted, the API service automatically publishes events:
+When items and comments are created/updated/deleted, the API service automatically publishes events:
+
+#### Item Events
 
 ```json
 // Publishes to: auction.item exchange
@@ -282,7 +348,31 @@ When items are created/updated/deleted, the API service automatically publishes 
   "payload": {
     "id": "item-uuid",
     "name": "Vintage Camera",
-    "sellerId": "user-123"
+    "sellerId": "user-123",
+    "startPrice": "100.00",
+    "currentPrice": "100.00",
+    "currencyCode": "USD"
+  }
+}
+```
+
+#### Comment Events
+
+```json
+// Publishes to: auction.item exchange
+// Routing key: item.comment.created.v1
+{
+  "event": "item.comment.created",
+  "version": "v1",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "traceId": "trace-uuid",
+  "correlationId": "correlation-uuid",
+  "payload": {
+    "id": "comment-uuid",
+    "itemId": "item-uuid",
+    "authorId": "user-123",
+    "content": "Is this item still available?",
+    "createdAt": "2024-01-15T10:00:00Z"
   }
 }
 ```
@@ -309,6 +399,58 @@ The worker service listens for events from other services:
 }
 ```
 
+### Event Use Cases
+
+**Item Events** are consumed by:
+- **Payment Service** → Process payments when items are sold
+- **Notification Service** → Notify users about item updates
+- **Analytics Service** → Track item creation and sales metrics
+
+**Comment Events** are consumed by:
+- **Notification Service** → Notify item sellers when new questions are asked
+- **Moderation Service** → Review comments for inappropriate content
+- **Analytics Service** → Track user engagement and activity
+
+## Domain Model
+
+The auction service supports a rich domain model for marketplace items:
+
+### Core Entities
+
+**Item** - The main auction item with pricing and timing information
+- Basic info: name, description, seller ID
+- Pricing: start price, current price, bid increment, currency
+- Timing: start date, end date
+- Status: active, sold, expired, cancelled
+- Buyer info: set when item is sold
+
+**Category** - Hierarchical classification system for items
+- Supports nested categories (parent-child relationships)
+- Items can belong to multiple categories
+
+**ItemAttribute** - Custom key-value metadata for items
+- Flexible schema for item-specific properties
+- Examples: brand, condition, size, color, year
+
+**ItemComment** - User discussions and questions about items
+- User-generated content
+- Timestamped for chronological ordering
+- Supports moderation via deletion
+
+**ItemImage** - Photo gallery for items
+- Multiple images per item
+- Display order support
+- Image URLs for external storage
+
+### Relationships
+
+```
+Item (1) ←→ (N) ItemCategory ←→ (1) Category
+Item (1) ←→ (N) ItemAttribute
+Item (1) ←→ (N) ItemComment
+Item (1) ←→ (N) ItemImage
+```
+
 ## Database Migrations
 
 Migrations are automatically applied on startup via Docker `docker-entrypoint-initdb.d`.
@@ -317,6 +459,11 @@ Location: `infra/postgres/migrations/`
 
 Current migrations:
 - `001_create_items.sql` - Creates items table with triggers and indexes
+- `002_create_categories.sql` - Creates categories table for item classification
+- `003_create_item_categories.sql` - Creates many-to-many relationship between items and categories
+- `004_create_item_attributes.sql` - Creates item attributes table for custom metadata
+- `005_create_item_comments.sql` - Creates comments table for user discussions
+- `006_create_item_images.sql` - Creates images table for item photos
 
 ## Configuration
 

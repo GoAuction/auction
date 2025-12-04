@@ -8,15 +8,17 @@ import (
 
 // Domain constants
 const (
-	ItemDomain = "item"
+	ItemDomain   = "item"
 	ItemExchange = "auction.item"
 )
 
 // Event names
 const (
-	ItemCreatedEvent = "item.created"
-	ItemUpdatedEvent = "item.updated"
-	ItemDeletedEvent = "item.deleted"
+	ItemCreatedEvent        = "item.created"
+	ItemUpdatedEvent        = "item.updated"
+	ItemDeletedEvent        = "item.deleted"
+	ItemCommentCreatedEvent = "item.comment.created"
+	ItemCommentDeletedEvent = "item.comment.deleted"
 )
 
 // Event versions
@@ -64,5 +66,20 @@ type ItemUpdatedPayload struct {
 type ItemDeletedPayload struct {
 	ID        string    `json:"id"`
 	SellerID  string    `json:"sellerId"`
+	DeletedAt time.Time `json:"deletedAt"`
+}
+
+type ItemCommentCreatedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	AuthorID  string    `json:"authorId"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ItemCommentDeletedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	AuthorID  string    `json:"authorId"`
 	DeletedAt time.Time `json:"deletedAt"`
 }

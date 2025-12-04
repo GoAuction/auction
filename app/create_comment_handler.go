@@ -8,6 +8,7 @@ import (
 	"database/sql"
 
 	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 )
 
 type CreateCommentHandler struct {
@@ -67,7 +68,39 @@ func (c *CreateCommentHandler) Handle(ctx context.Context, req *CreateCommentReq
 		return nil, httperror.InternalServerError("comments.create.internal_error", "Failed to create comment", err)
 	}
 
+	c.publishEvent(ctx, comment)
+
 	return &CreateCommentResponse{
 		Comment: comment,
 	}, nil
+}
+
+func (e CreateCommentHandler) publishEvent(ctx context.Context, comment domain.ItemComment) {
+	eventPayload := events.ItemCommentCreatedPayload{
+		ID:        comment.ID,
+		ItemID:    comment.ItemID,
+		AuthorID:  comment.UserID,
+		Content:   comment.Content,
+		CreatedAt: comment.CreatedAt,
+	}
+
+	headers := events.Headers{
+		TraceID:       events.GenerateTraceID(),
+		CorrelationID: events.GenerateCorrelationID(),
+		Service:       "auction",
+	}
+
+	event := events.NewEvent(
+		events.ItemCommentCreatedEvent,
+		events.EventVersionV1,
+		eventPayload,
+		headers,
+	)
+
+	if err := e.eventPublisher.Publish(ctx, events.ItemExchange, event, headers); err != nil {
+		zap.L().Error("Failed to publish item.comment.created event",
+			zap.String("commentID", comment.ID),
+			zap.Error(err),
+		)
+	}
 }
