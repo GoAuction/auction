@@ -422,9 +422,6 @@ func (r *PgRepository) GetItemCommentsByItemID(ctx context.Context, itemID strin
 	limit := pageSize
 	offset := (page - 1) * pageSize
 
-	fmt.Println("limit:", limit)
-	fmt.Println("offset:", offset)
-
 	err := r.db.SelectContext(ctx, &comments, "SELECT * FROM item_comments WHERE item_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3", itemID, limit, offset)
 	if err != nil {
 		return comments, err
@@ -482,4 +479,28 @@ func (r *PgRepository) GetCommentByID(ctx context.Context, id string) (domain.It
 	}
 
 	return comment, nil
+}
+
+func (r *PgRepository) GetItemImages(ctx context.Context, itemID string, page, pageSize int) ([]domain.ItemImage, error) {
+	images := make([]domain.ItemImage, 0)
+
+	offset := (page - 1) * pageSize
+
+	err := r.db.SelectContext(ctx, &images, "SELECT * FROM item_images WHERE item_id = $1 ORDER BY display_order ASC LIMIT $2 OFFSET $3", itemID, pageSize, offset)
+	if err != nil {
+		return images, err
+	}
+
+	return images, nil
+}
+
+func (r *PgRepository) CountItemImages(ctx context.Context, itemID string) (int, error) {
+	var count int
+
+	err := r.db.GetContext(ctx, &count, "SELECT COUNT(*) FROM item_images WHERE item_id = $1", itemID)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

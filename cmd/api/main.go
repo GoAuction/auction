@@ -119,6 +119,7 @@ func main() {
 	getCommentsHandler := auctionApp.NewGetCommentsHandler(pgRepository)
 	createCommentHandler := auctionApp.NewCreateCommentHandler(pgRepository, eventPublisher)
 	deleteCommentHandler := auctionApp.NewDeleteCommentHandler(pgRepository, eventPublisher)
+	getItemImagesHandler := auctionApp.NewGetItemImagesHandler(pgRepository)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
@@ -128,6 +129,7 @@ func main() {
 	publicRoutes.Get("/items/:id/comments", handle[auctionApp.GetCommentsRequest, auctionApp.GetCommentsResponse](getCommentsHandler))
 	publicRoutes.Get("/categories", handle[auctionApp.GetCategoriesRequest, auctionApp.GetCategoriesResponse](getCategoriesHandler))
 	publicRoutes.Get("/categories/:id", handle[auctionApp.GetCategoryRequest, auctionApp.GetCategoryResponse](getCategoryHandler))
+	publicRoutes.Get("/items/:id/images", handle[auctionApp.GetItemImagesRequest, auctionApp.GetItemImagesResponse](getItemImagesHandler))
 
 	privateRoutes := app.Group("/api/v1", securityHeadersHandler)
 	privateRoutes.Post("/items", handle[auctionApp.CreateItemRequest, auctionApp.CreateItemResponse](createItemHadler))

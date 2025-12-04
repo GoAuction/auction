@@ -24,4 +24,6 @@ type Repository interface {
 	CreateComment(ctx context.Context, itemID string, comment string, userID string, parentID *string) (domain.ItemComment, error)
 	DeleteComment(ctx context.Context, id string) error
 	GetCommentByID(ctx context.Context, id string) (domain.ItemComment, error)
+	GetItemImages(ctx context.Context, itemID string, page, limit int) ([]domain.ItemImage, error)
+	CountItemImages(ctx context.Context, itemID string) (int, error)
 }
