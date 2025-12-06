@@ -20,6 +20,8 @@ The auction service consists of two main components:
 - `item.deleted.v1` → When an item is deleted
 - `item.comment.created.v1` → When a comment is added to an item
 - `item.comment.deleted.v1` → When a comment is deleted from an item
+- `item.image.uploaded.v1` → When an image is uploaded to an item
+- `item.image.deleted.v1` → When an image is deleted from an item
 
 ### 2. Worker Service (`cmd/worker/`)
 **Role:** Event Consumer + Item State Manager
@@ -56,6 +58,8 @@ auction/
 │   ├── create_comment_handler.go
 │   ├── delete_comment_handler.go
 │   ├── get_item_images_handler.go
+│   ├── upload_item_image_handler.go
+│   ├── delete_item_image_handler.go
 │   └── repository.go
 │
 ├── domain/                     # Domain entities
@@ -88,7 +92,8 @@ auction/
 ├── pkg/
 │   ├── config/                 # Configuration management
 │   ├── events/                 # Event schemas
-│   └── httperror/              # HTTP error handling
+│   ├── httperror/              # HTTP error handling
+│   └── aws/                    # AWS S3 integration
 │
 ├── docker-compose.yaml         # Multi-service setup with replicas
 └── Dockerfile                  # Multi-stage build (api + worker)
@@ -285,6 +290,10 @@ go run cmd/worker/main.go
 - `POST /api/v1/items/:id/comments` - Add comment to an item
 - `DELETE /api/v1/items/:itemId/comments/:commentId` - Delete a comment
 
+**Images:**
+- `POST /api/v1/items/:id/images` - Upload image to an item (multipart/form-data)
+- `DELETE /api/v1/items/:itemId/images/:imageId` - Delete an image from an item
+
 ### API Examples
 
 #### Create Item
@@ -326,6 +335,19 @@ curl -X POST http://localhost:8081/api/v1/items/item-uuid/comments \
 #### Get Categories
 ```bash
 curl -X GET http://localhost:8081/api/v1/categories
+```
+
+#### Upload Item Image
+```bash
+curl -X POST http://localhost:8081/api/v1/items/item-uuid/images \
+  -H "X-User-ID: user-123" \
+  -F "image=@/path/to/image.jpg"
+```
+
+#### Delete Item Image
+```bash
+curl -X DELETE http://localhost:8081/api/v1/items/item-uuid/images/image-uuid \
+  -H "X-User-ID: user-123"
 ```
 
 ## Event Integration
@@ -377,6 +399,41 @@ When items and comments are created/updated/deleted, the API service automatical
 }
 ```
 
+#### Image Events
+
+```json
+// Publishes to: auction.item exchange
+// Routing key: item.image.uploaded.v1
+{
+  "event": "item.image.uploaded",
+  "version": "v1",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "traceId": "trace-uuid",
+  "correlationId": "correlation-uuid",
+  "payload": {
+    "id": "image-uuid",
+    "itemId": "item-uuid",
+    "imageUrl": "https://s3.amazonaws.com/bucket/items/item-uuid/image-uuid.jpg",
+    "createdAt": "2024-01-15T10:00:00Z"
+  }
+}
+
+// Routing key: item.image.deleted.v1
+{
+  "event": "item.image.deleted",
+  "version": "v1",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "traceId": "trace-uuid",
+  "correlationId": "correlation-uuid",
+  "payload": {
+    "id": "image-uuid",
+    "itemId": "item-uuid",
+    "imageUrl": "https://s3.amazonaws.com/bucket/items/item-uuid/image-uuid.jpg",
+    "deletedAt": "2024-01-15T10:00:00Z"
+  }
+}
+```
+
 ### Consuming Events (Worker Service)
 
 The worker service listens for events from other services:
@@ -411,6 +468,12 @@ The worker service listens for events from other services:
 - **Moderation Service** → Review comments for inappropriate content
 - **Analytics Service** → Track user engagement and activity
 
+**Image Events** are consumed by:
+- **CDN Service** → Cache and optimize images for delivery
+- **Image Processing Service** → Generate thumbnails and resize images
+- **Moderation Service** → Scan images for inappropriate content
+- **Analytics Service** → Track media uploads and storage metrics
+
 ## Domain Model
 
 The auction service supports a rich domain model for marketplace items:
@@ -440,7 +503,9 @@ The auction service supports a rich domain model for marketplace items:
 **ItemImage** - Photo gallery for items
 - Multiple images per item
 - Display order support
-- Image URLs for external storage
+- Image URLs for external storage (AWS S3 / MinIO)
+- Supports PNG and JPEG/JPG formats
+- Maximum file size: 5MB per image
 
 ### Relationships
 
@@ -465,6 +530,99 @@ Current migrations:
 - `005_create_item_comments.sql` - Creates comments table for user discussions
 - `006_create_item_images.sql` - Creates images table for item photos
 
+## Image Storage (AWS S3 / MinIO)
+
+The auction service supports uploading and managing item images using AWS S3 or MinIO (S3-compatible storage).
+
+### Features
+
+- **Multipart Form Upload**: Upload images via `multipart/form-data` with field name `image`
+- **File Validation**:
+  - Supported formats: PNG, JPEG, JPG
+  - Maximum file size: 5MB
+  - Content-Type validation
+- **Authorization**: Only item sellers can upload/delete images for their items
+- **Event-Driven**: Publishes `item.image.uploaded.v1` and `item.image.deleted.v1` events
+- **URL Construction**: Automatic image URL generation for both AWS S3 and MinIO
+
+### Storage Structure
+
+Images are stored in the following S3 key pattern:
+```
+items/{itemId}/{uuid}.{extension}
+
+Example:
+items/abc123-def456/78910-xyz123.jpg
+```
+
+### Using MinIO (Development)
+
+MinIO is an S3-compatible object storage server ideal for local development:
+
+```bash
+# Start MinIO with Docker
+docker run -d \
+  --name minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  minio/minio server /data --console-address ":9001"
+
+# Access MinIO Console: http://localhost:9001
+# Credentials: minioadmin / minioadmin
+```
+
+Environment configuration for MinIO:
+```env
+AWS_ENDPOINT=http://localhost:9000
+AWS_ACCESS_KEY=minioadmin
+AWS_SECRET_KEY=minioadmin
+AWS_BUCKET=auction-images
+```
+
+### Using AWS S3 (Production)
+
+For production deployment with AWS S3:
+
+1. Create an S3 bucket (e.g., `auction-images-prod`)
+2. Configure bucket policy for public read access (optional)
+3. Create IAM user with S3 permissions (`s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`)
+4. Set environment variables:
+
+```env
+AWS_ENDPOINT=                              # Leave empty for AWS S3
+AWS_ACCESS_KEY=AKIA...                     # IAM access key
+AWS_SECRET_KEY=wJal...                     # IAM secret key
+AWS_DEFAULT_REGION=eu-central-1            # Your AWS region
+AWS_BUCKET=auction-images-prod             # Your bucket name
+```
+
+### Image URL Format
+
+**MinIO/Custom Endpoint:**
+```
+http(s)://{AWS_ENDPOINT}/{AWS_BUCKET}/{key}
+Example: http://localhost:9000/auction-images/items/abc123/image.jpg
+```
+
+**AWS S3:**
+```
+https://{bucket}.s3.{region}.amazonaws.com/{key}
+Example: https://auction-images.s3.eu-central-1.amazonaws.com/items/abc123/image.jpg
+```
+
+### Error Handling
+
+The image upload handler includes comprehensive error handling:
+
+- **Missing file**: Returns `400 Bad Request` if `image` field is missing
+- **File too large**: Returns `400 Bad Request` if file exceeds 5MB
+- **Invalid format**: Returns `400 Bad Request` if not PNG/JPEG/JPG
+- **Unauthorized**: Returns `403 Forbidden` if user is not the item seller
+- **Storage failure**: Returns `500 Internal Server Error` if S3 upload fails
+- **Rollback**: Automatically deletes S3 object if database save fails
+
 ## Configuration
 
 Environment variables (`.env`):
@@ -484,6 +642,13 @@ POSTGRES_PASSWORD=postgres
 # Message Broker
 RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
 SERVICE_NAME=auction
+
+# AWS S3 / MinIO (for image storage)
+AWS_ENDPOINT=http://localhost:9000          # MinIO endpoint (leave empty for AWS S3)
+AWS_ACCESS_KEY=minioadmin                   # S3 access key
+AWS_SECRET_KEY=minioadmin                   # S3 secret key
+AWS_DEFAULT_REGION=eu-central-1             # AWS region
+AWS_BUCKET=auction-images                   # Bucket name
 ```
 
 ## Monitoring
@@ -597,3 +762,7 @@ Total DB Connections < PostgreSQL max_connections
 5 replicas × 50 workers × 15 conns = 750 potential connections
 → Need to set PostgreSQL max_connections ≥ 800
 ```
+
+---
+
+> **Note**: This documentation was generated and maintained with assistance from Claude Code AI.
