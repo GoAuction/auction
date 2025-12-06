@@ -16,6 +16,11 @@ type AppConfig struct {
 	PostgresPort     string `mapstructure:"POSTGRES_PORT"`
 	RabbitMQURL      string `mapstructure:"RABBITMQ_URL"`
 	ServiceName      string `mapstructure:"SERVICE_NAME"`
+	AWSEndpoint      string `mapstructure:"AWS_ENDPOINT"`
+	AWSBucket        string `mapstructure:"AWS_BUCKET"`
+	AWSDefaultRegion string `mapstructure:"AWS_DEFAULT_REGION"`
+	AWSAccessKey     string `mapstructure:"AWS_ACCESS_KEY"`
+	AWSSecretKey     string `mapstructure:"AWS_SECRET_KEY"`
 }
 
 func Read() *AppConfig {
@@ -47,6 +52,11 @@ func bindEnvVariables() {
 	_ = viper.BindEnv("POSTGRES_PORT")
 	_ = viper.BindEnv("RABBITMQ_URL")
 	_ = viper.BindEnv("SERVICE_NAME")
+	_ = viper.BindEnv("AWS_ENDPOINT")
+	_ = viper.BindEnv("AWS_BUCKET")
+	_ = viper.BindEnv("AWS_DEFAULT_REGION")
+	_ = viper.BindEnv("AWS_ACCESS_KEY")
+	_ = viper.BindEnv("AWS_SECRET_KEY")
 }
 
 func setDefaults() {

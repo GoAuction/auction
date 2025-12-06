@@ -63,6 +63,8 @@ func handle[R Request, Res Response](handler HandlerInterface[R, Res]) fiber.Han
 		}
 
 		ctx := c.UserContext()
+		// Add Fiber context to the context for handlers that need access to multipart data
+		ctx = context.WithValue(ctx, "fiber", c)
 
 		res, err := handler.Handle(ctx, &req)
 		if err != nil {
@@ -120,6 +122,8 @@ func main() {
 	createCommentHandler := auctionApp.NewCreateCommentHandler(pgRepository, eventPublisher)
 	deleteCommentHandler := auctionApp.NewDeleteCommentHandler(pgRepository, eventPublisher)
 	getItemImagesHandler := auctionApp.NewGetItemImagesHandler(pgRepository)
+	uploadItemImageHandler := auctionApp.NewUploadItemImageHandler(pgRepository, eventPublisher)
+	deleteItemImageHandler := auctionApp.NewDeleteItemImageHandler(pgRepository, eventPublisher)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
@@ -137,6 +141,8 @@ func main() {
 	privateRoutes.Delete("/items/:id", handle[auctionApp.DeleteItemRequest, auctionApp.DeleteItemResponse](deleteItemHandler))
 	privateRoutes.Post("/items/:id/comments", handle[auctionApp.CreateCommentRequest, auctionApp.CreateCommentResponse](createCommentHandler))
 	privateRoutes.Delete("/items/:itemId/comments/:commentId", handle[auctionApp.DeleteCommentRequest, auctionApp.DeleteCommentResponse](deleteCommentHandler))
+	privateRoutes.Post("/items/:itemId/images", handle[auctionApp.UploadItemImageRequest, auctionApp.UploadItemImageResponse](uploadItemImageHandler))
+	privateRoutes.Delete("/items/:itemId/images/:imageId", handle[auctionApp.DeleteItemImageRequest, auctionApp.DeleteItemImageResponse](deleteItemImageHandler))
 
 	// Start server in a goroutine
 	go func() {

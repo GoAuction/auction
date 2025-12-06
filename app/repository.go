@@ -26,4 +26,7 @@ type Repository interface {
 	GetCommentByID(ctx context.Context, id string) (domain.ItemComment, error)
 	GetItemImages(ctx context.Context, itemID string, page, limit int) ([]domain.ItemImage, error)
 	CountItemImages(ctx context.Context, itemID string) (int, error)
+	SaveImage(ctx context.Context, itemID string, imageUrl string) (domain.ItemImage, error)
+	DeleteItemImage(ctx context.Context, itemID string, imageID string) error
+	GetItemImage(ctx context.Context, itemId string, imageId string) (domain.ItemImage, error)
 }

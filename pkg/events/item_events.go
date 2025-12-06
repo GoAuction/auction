@@ -19,6 +19,8 @@ const (
 	ItemDeletedEvent        = "item.deleted"
 	ItemCommentCreatedEvent = "item.comment.created"
 	ItemCommentDeletedEvent = "item.comment.deleted"
+	ItemImageUploadedEvent  = "item.image.uploaded"
+	ItemImageDeletedEvent   = "item.image.deleted"
 )
 
 // Event versions
@@ -62,7 +64,6 @@ type ItemUpdatedPayload struct {
 	UpdatedAt    time.Time        `json:"updatedAt"`
 }
 
-// ItemDeletedPayload represents the payload for item.deleted event
 type ItemDeletedPayload struct {
 	ID        string    `json:"id"`
 	SellerID  string    `json:"sellerId"`
@@ -81,5 +82,19 @@ type ItemCommentDeletedPayload struct {
 	ID        string    `json:"id"`
 	ItemID    string    `json:"itemId"`
 	AuthorID  string    `json:"authorId"`
+	DeletedAt time.Time `json:"deletedAt"`
+}
+
+type ItemImageUploadedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	ImageURL  string    `json:"imageUrl"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ItemImageDeletedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	ImageURL  string    `json:"imageUrl"`
 	DeletedAt time.Time `json:"deletedAt"`
 }

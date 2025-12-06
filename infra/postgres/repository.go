@@ -504,3 +504,44 @@ func (r *PgRepository) CountItemImages(ctx context.Context, itemID string) (int,
 
 	return count, nil
 }
+
+func (r *PgRepository) SaveImage(ctx context.Context, itemID string, imageUrl string) (domain.ItemImage, error) {
+	query := `
+		INSERT INTO item_images (item_id, url)
+		VALUES ($1, $2)
+		RETURNING id, item_id, url, display_order, created_at, updated_at
+	`
+
+	var image domain.ItemImage
+	err := r.db.GetContext(ctx, &image, query, itemID, imageUrl)
+	if err != nil {
+		return domain.ItemImage{}, err
+	}
+
+	return image, nil
+}
+
+func (r *PgRepository) DeleteItemImage(ctx context.Context, itemID string, imageID string) error {
+	query := `
+		DELETE FROM item_images
+		WHERE id = $1 AND item_id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, imageID, itemID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PgRepository) GetItemImage(ctx context.Context, itemId string, imageId string) (domain.ItemImage, error) {
+	var image domain.ItemImage
+
+	err := r.db.GetContext(ctx, &image, "SELECT * FROM item_images WHERE id = $1 AND item_id = $2", imageId, itemId)
+	if err != nil {
+		return domain.ItemImage{}, err
+	}
+
+	return image, nil
+}
