@@ -14,13 +14,15 @@ const (
 
 // Event names
 const (
-	ItemCreatedEvent        = "item.created"
-	ItemUpdatedEvent        = "item.updated"
-	ItemDeletedEvent        = "item.deleted"
-	ItemCommentCreatedEvent = "item.comment.created"
-	ItemCommentDeletedEvent = "item.comment.deleted"
-	ItemImageUploadedEvent  = "item.image.uploaded"
-	ItemImageDeletedEvent   = "item.image.deleted"
+	ItemCreatedEvent          = "item.created"
+	ItemUpdatedEvent          = "item.updated"
+	ItemDeletedEvent          = "item.deleted"
+	ItemCommentCreatedEvent   = "item.comment.created"
+	ItemCommentDeletedEvent   = "item.comment.deleted"
+	ItemImageUploadedEvent    = "item.image.uploaded"
+	ItemImageDeletedEvent     = "item.image.deleted"
+	ItemAttributeCreatedEvent = "item.attribute.created"
+	ItemAttributeDeletedEvent = "item.attribute.deleted"
 )
 
 // Event versions
@@ -97,4 +99,18 @@ type ItemImageDeletedPayload struct {
 	ItemID    string    `json:"itemId"`
 	ImageURL  string    `json:"imageUrl"`
 	DeletedAt time.Time `json:"deletedAt"`
+}
+
+type ItemAttributeDeletedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	DeletedAt time.Time `json:"deletedAt"`
+}
+
+type ItemAttributeCreatedPayload struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"itemId"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	CreatedAt time.Time `json:"createdAt"`
 }

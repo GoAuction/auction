@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -544,4 +545,63 @@ func (r *PgRepository) GetItemImage(ctx context.Context, itemId string, imageId 
 	}
 
 	return image, nil
+}
+
+func (r *PgRepository) GetItemAttributes(ctx context.Context, itemID string) ([]domain.ItemAttribute, error) {
+	attributes := make([]domain.ItemAttribute, 0)
+
+	err := r.db.SelectContext(ctx, &attributes, "SELECT * FROM item_attributes WHERE item_id = $1", itemID)
+	if err != nil {
+		return attributes, err
+	}
+
+	return attributes, nil
+}
+
+func (r *PgRepository) GetItemAttribute(ctx context.Context, itemID string, attributeID string) (domain.ItemAttribute, error) {
+	var attribute domain.ItemAttribute
+
+	err := r.db.GetContext(ctx, &attribute, "SELECT * FROM item_attributes WHERE id = $1 AND item_id = $2", attributeID, itemID)
+	if err != nil {
+		return domain.ItemAttribute{}, err
+	}
+
+	return attribute, nil
+}
+
+func (r *PgRepository) CreateItemAttributes(ctx context.Context, attributes []domain.ItemAttribute) ([]domain.ItemAttribute, error) {
+	if len(attributes) == 0 {
+		return []domain.ItemAttribute{}, nil
+	}
+
+	values := make([]any, 0)
+	placeholders := make([]string, 0)
+
+	paramIndex := 1
+	for _, attribute := range attributes {
+		values = append(values, attribute.ItemID, attribute.Key, attribute.Value)
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", paramIndex, paramIndex+1, paramIndex+2))
+		paramIndex += 3
+	}
+
+	query := fmt.Sprintf(
+		`INSERT INTO item_attributes (item_id, key, value) VALUES %s RETURNING id, item_id, key, value, created_at, updated_at`,
+		strings.Join(placeholders, ", "),
+	)
+
+	result := make([]domain.ItemAttribute, 0)
+	err := r.db.SelectContext(ctx, &result, query, values...)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+func (r *PgRepository) DeleteItemAttribute(ctx context.Context, itemID string, attributeID string) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM item_attributes WHERE id = $1 AND item_id = $2", attributeID, itemID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

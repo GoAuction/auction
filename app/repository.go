@@ -29,4 +29,8 @@ type Repository interface {
 	SaveImage(ctx context.Context, itemID string, imageUrl string) (domain.ItemImage, error)
 	DeleteItemImage(ctx context.Context, itemID string, imageID string) error
 	GetItemImage(ctx context.Context, itemId string, imageId string) (domain.ItemImage, error)
+	GetItemAttributes(ctx context.Context, itemID string) ([]domain.ItemAttribute, error)
+	GetItemAttribute(ctx context.Context, itemID string, attributeID string) (domain.ItemAttribute, error)
+	CreateItemAttributes(ctx context.Context, attributes []domain.ItemAttribute) ([]domain.ItemAttribute, error)
+	DeleteItemAttribute(ctx context.Context, itemID string, attributeID string) error
 }

@@ -124,6 +124,10 @@ func main() {
 	getItemImagesHandler := auctionApp.NewGetItemImagesHandler(pgRepository)
 	uploadItemImageHandler := auctionApp.NewUploadItemImageHandler(pgRepository, eventPublisher)
 	deleteItemImageHandler := auctionApp.NewDeleteItemImageHandler(pgRepository, eventPublisher)
+	createItemAttributesHandler := auctionApp.NewCreateItemAttributesHandler(pgRepository, eventPublisher)
+	getItemAttributesHandler := auctionApp.NewGetItemAttributesHandler(pgRepository)
+	getItemAttributeHandler := auctionApp.NewGetItemAttributeHandler(pgRepository)
+	deleteItemAttributeHandler := auctionApp.NewDeleteItemAttributeHandler(pgRepository, eventPublisher)
 
 	securityHeadersHandler := middleware.NewSecurityHeadersMiddleware()
 
@@ -134,6 +138,8 @@ func main() {
 	publicRoutes.Get("/categories", handle[auctionApp.GetCategoriesRequest, auctionApp.GetCategoriesResponse](getCategoriesHandler))
 	publicRoutes.Get("/categories/:id", handle[auctionApp.GetCategoryRequest, auctionApp.GetCategoryResponse](getCategoryHandler))
 	publicRoutes.Get("/items/:id/images", handle[auctionApp.GetItemImagesRequest, auctionApp.GetItemImagesResponse](getItemImagesHandler))
+	publicRoutes.Get("/items/:itemId/attributes", handle[auctionApp.GetItemAttributesRequest, auctionApp.GetItemAttributesResponse](getItemAttributesHandler))
+	publicRoutes.Get("/items/:itemId/attributes/:attributeId", handle[auctionApp.GetItemAttributeRequest, auctionApp.GetItemAttributeResponse](getItemAttributeHandler))
 
 	privateRoutes := app.Group("/api/v1", securityHeadersHandler)
 	privateRoutes.Post("/items", handle[auctionApp.CreateItemRequest, auctionApp.CreateItemResponse](createItemHadler))
@@ -143,6 +149,8 @@ func main() {
 	privateRoutes.Delete("/items/:itemId/comments/:commentId", handle[auctionApp.DeleteCommentRequest, auctionApp.DeleteCommentResponse](deleteCommentHandler))
 	privateRoutes.Post("/items/:itemId/images", handle[auctionApp.UploadItemImageRequest, auctionApp.UploadItemImageResponse](uploadItemImageHandler))
 	privateRoutes.Delete("/items/:itemId/images/:imageId", handle[auctionApp.DeleteItemImageRequest, auctionApp.DeleteItemImageResponse](deleteItemImageHandler))
+	privateRoutes.Post("/items/:itemId/attributes", handle[auctionApp.CreateItemAttributesRequest, auctionApp.CreateItemAttributesResponse](createItemAttributesHandler))
+	privateRoutes.Delete("/items/:itemId/attributes/:attributeId", handle[auctionApp.DeleteItemAttributeRequest, auctionApp.DeleteItemAttributeResponse](deleteItemAttributeHandler))
 
 	// Start server in a goroutine
 	go func() {
