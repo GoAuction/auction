@@ -22,6 +22,8 @@ The auction service consists of two main components:
 - `item.comment.deleted.v1` → When a comment is deleted from an item
 - `item.image.uploaded.v1` → When an image is uploaded to an item
 - `item.image.deleted.v1` → When an image is deleted from an item
+- `item.attribute.created.v1` → When item attributes are created
+- `item.attribute.deleted.v1` → When an item attribute is deleted
 
 ### 2. Worker Service (`cmd/worker/`)
 **Role:** Event Consumer + Item State Manager
@@ -60,6 +62,10 @@ auction/
 │   ├── get_item_images_handler.go
 │   ├── upload_item_image_handler.go
 │   ├── delete_item_image_handler.go
+│   ├── get_item_attributes_handlers.go
+│   ├── get_item_attribute_handler.go
+│   ├── create_item_attributes_handler.go
+│   ├── delete_item_attribute_handler.go
 │   └── repository.go
 │
 ├── domain/                     # Domain entities
@@ -274,6 +280,8 @@ go run cmd/worker/main.go
 - `GET /api/v1/items/:id` - Get item details by ID
 - `GET /api/v1/items/:id/comments` - Get all comments for an item
 - `GET /api/v1/items/:id/images` - Get all images for an item
+- `GET /api/v1/items/:itemId/attributes` - Get all attributes for an item
+- `GET /api/v1/items/:itemId/attributes/:attributeId` - Get a specific attribute
 
 **Categories:**
 - `GET /api/v1/categories` - List all categories
@@ -293,6 +301,10 @@ go run cmd/worker/main.go
 **Images:**
 - `POST /api/v1/items/:id/images` - Upload image to an item (multipart/form-data)
 - `DELETE /api/v1/items/:itemId/images/:imageId` - Delete an image from an item
+
+**Attributes:**
+- `POST /api/v1/items/:itemId/attributes` - Create attributes for an item (bulk)
+- `DELETE /api/v1/items/:itemId/attributes/:attributeId` - Delete a specific attribute
 
 ### API Examples
 
@@ -347,6 +359,44 @@ curl -X POST http://localhost:8081/api/v1/items/item-uuid/images \
 #### Delete Item Image
 ```bash
 curl -X DELETE http://localhost:8081/api/v1/items/item-uuid/images/image-uuid \
+  -H "X-User-ID: user-123"
+```
+
+#### Create Item Attributes
+```bash
+curl -X POST http://localhost:8081/api/v1/items/item-uuid/attributes \
+  -H "Content-Type: application/json" \
+  -H "X-User-ID: user-123" \
+  -d '{
+    "attributes": [
+      {
+        "key": "brand",
+        "value": "Canon"
+      },
+      {
+        "key": "condition",
+        "value": "excellent"
+      },
+      {
+        "key": "year",
+        "value": "1965"
+      }
+    ]
+  }'
+```
+
+#### Get Item Attributes
+```bash
+# Get all attributes for an item
+curl -X GET http://localhost:8081/api/v1/items/item-uuid/attributes
+
+# Get a specific attribute
+curl -X GET http://localhost:8081/api/v1/items/item-uuid/attributes/attribute-uuid
+```
+
+#### Delete Item Attribute
+```bash
+curl -X DELETE http://localhost:8081/api/v1/items/item-uuid/attributes/attribute-uuid \
   -H "X-User-ID: user-123"
 ```
 
@@ -434,6 +484,41 @@ When items and comments are created/updated/deleted, the API service automatical
 }
 ```
 
+#### Attribute Events
+
+```json
+// Publishes to: auction.item exchange
+// Routing key: item.attribute.created.v1
+{
+  "event": "item.attribute.created",
+  "version": "v1",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "traceId": "trace-uuid",
+  "correlationId": "correlation-uuid",
+  "payload": {
+    "id": "attribute-uuid",
+    "itemId": "item-uuid",
+    "key": "brand",
+    "value": "Canon",
+    "createdAt": "2024-01-15T10:00:00Z"
+  }
+}
+
+// Routing key: item.attribute.deleted.v1
+{
+  "event": "item.attribute.deleted",
+  "version": "v1",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "traceId": "trace-uuid",
+  "correlationId": "correlation-uuid",
+  "payload": {
+    "id": "attribute-uuid",
+    "itemId": "item-uuid",
+    "deletedAt": "2024-01-15T10:00:00Z"
+  }
+}
+```
+
 ### Consuming Events (Worker Service)
 
 The worker service listens for events from other services:
@@ -473,6 +558,12 @@ The worker service listens for events from other services:
 - **Image Processing Service** → Generate thumbnails and resize images
 - **Moderation Service** → Scan images for inappropriate content
 - **Analytics Service** → Track media uploads and storage metrics
+
+**Attribute Events** are consumed by:
+- **Search Service** → Index item attributes for faceted search (filter by brand, condition, etc.)
+- **Recommendation Service** → Use attributes to find similar items
+- **Analytics Service** → Track which attributes are most commonly used
+- **Data Quality Service** → Validate and normalize attribute values
 
 ## Domain Model
 
