@@ -51,7 +51,7 @@ services:
     env_file:
       - .env
     deploy:
-      replicas: 3
+      replicas: 1
     command: go run cmd/worker/main.go
     depends_on:
       auction-postgres:
@@ -72,10 +72,49 @@ services:
     env_file:
       - .env
     deploy:
-      replicas: 3
+      replicas: 1
     depends_on:
       auction-postgres:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - auction-internal
+      - rabbitmq-shared
+
+  auction-grpc-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - .env
+    command: air -c .air-grpc.toml
+    depends_on:
+      auction-postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - auction-go-mod:/go/pkg/mod
+    ports:
+      - "9090:${GRPC_PORT:-9090}"
+    restart: unless-stopped
+    networks:
+      - auction-internal
+      - rabbitmq-shared
+
+  auction-grpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: grpc
+    env_file:
+      - .env
+    depends_on:
+      auction-postgres:
+        condition: service_healthy
+    ports:
+      - "9090:${GRPC_PORT:-9090}"
     restart: unless-stopped
     networks:
       - auction-internal

@@ -21,6 +21,7 @@ type AppConfig struct {
 	AWSDefaultRegion string `mapstructure:"AWS_DEFAULT_REGION"`
 	AWSAccessKey     string `mapstructure:"AWS_ACCESS_KEY"`
 	AWSSecretKey     string `mapstructure:"AWS_SECRET_KEY"`
+	GRPCPort         string `mapstructure:"GRPC_PORT"`
 }
 
 func Read() *AppConfig {
@@ -57,6 +58,7 @@ func bindEnvVariables() {
 	_ = viper.BindEnv("AWS_DEFAULT_REGION")
 	_ = viper.BindEnv("AWS_ACCESS_KEY")
 	_ = viper.BindEnv("AWS_SECRET_KEY")
+	_ = viper.BindEnv("GRPC_PORT")
 }
 
 func setDefaults() {
@@ -65,4 +67,5 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_HOST", "localhost")
 	viper.SetDefault("POSTGRES_PORT", "5432")
 	viper.SetDefault("SERVICE_NAME", "auction")
+	viper.SetDefault("GRPC_PORT", "9090")
 }

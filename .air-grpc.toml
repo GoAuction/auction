@@ -1,0 +1,16 @@
+# Air configuration for local development (gRPC Service)
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/auction-grpc ./cmd/grpc/main.go"
+bin = "./tmp/auction-grpc"
+full_bin = "./tmp/auction-grpc"
+include_ext = ["go", "mod", "sum", "yaml"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true
