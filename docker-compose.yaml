@@ -4,6 +4,7 @@ services:
   # API Service (HTTP Server + Publisher)
   auction-api-dev:
     profiles: ["dev"]
+    container_name: auction-api
     build:
       context: .
       dockerfile: Dockerfile
@@ -23,8 +24,11 @@ services:
     networks:
       - auction-internal
       - rabbitmq-shared
+      - traefik-shared
 
   auction-api:
+    profiles: ["prod"]
+    container_name: auction-api
     build:
       context: .
       dockerfile: Dockerfile
@@ -40,6 +44,7 @@ services:
     networks:
       - auction-internal
       - rabbitmq-shared
+      - traefik-shared
 
   # Worker Service (Event Consumer)
   auction-worker-dev:
@@ -65,6 +70,7 @@ services:
       - rabbitmq-shared
 
   auction-worker:
+    profiles: ["prod"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -104,6 +110,7 @@ services:
       - rabbitmq-shared
 
   auction-grpc:
+    profiles: ["prod"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -150,3 +157,6 @@ networks:
   rabbitmq-shared:
     external: true
     name: auction-rabbitmq-network
+  traefik-shared:
+    external: true
+    name: auction-traefik-network
