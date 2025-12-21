@@ -100,17 +100,17 @@ func (h *BidEventHandler) handleBidWon(ctx context.Context, event *events.Event)
 	}
 
 	// Validate required fields
-	itemID, ok := payload["itemId"].(string)
+	itemID, ok := payload["ItemID"].(string)
 	if !ok || itemID == "" {
 		return fmt.Errorf("malformed payload - itemId missing or invalid")
 	}
 
-	buyerID, ok := payload["buyerId"].(string)
+	buyerID, ok := payload["BuyerID"].(string)
 	if !ok || buyerID == "" {
 		return fmt.Errorf("malformed payload - buyerId missing or invalid")
 	}
 
-	finalAmount, ok := payload["finalAmount"].(string)
+	finalAmount, ok := payload["FinalAmount"].(string)
 	if !ok || finalAmount == "" {
 		return fmt.Errorf("malformed payload - finalAmount missing or invalid")
 	}
