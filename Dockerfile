@@ -30,6 +30,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /auction-
 FROM builder AS builder-worker
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /auction-worker ./cmd/worker/main.go
 
+# Build the gRPC service binary
+FROM builder AS builder-grpc
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /auction-grpc ./cmd/grpc/main.go
+
 # API Service Runner
 FROM gcr.io/distroless/base-debian12:nonroot AS api
 
@@ -49,3 +53,14 @@ WORKDIR /app
 COPY --from=builder-worker /auction-worker /usr/local/bin/auction-worker
 
 ENTRYPOINT ["/usr/local/bin/auction-worker"]
+
+# gRPC Service Runner
+FROM gcr.io/distroless/base-debian12:nonroot AS grpc
+
+WORKDIR /app
+
+COPY --from=builder-grpc /auction-grpc /usr/local/bin/auction-grpc
+
+EXPOSE 9090
+
+ENTRYPOINT ["/usr/local/bin/auction-grpc"]

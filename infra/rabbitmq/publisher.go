@@ -105,12 +105,27 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, exchange string, event 
 	// Get routing key from event
 	routingKey := event.GetRoutingKey()
 
+	// Create a dedicated channel for this publish operation to avoid confirmation conflicts
+	publishCh, err := p.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("failed to create publish channel: %w", err)
+	}
+	defer publishCh.Close()
+
+	// Enable confirms on this channel
+	if err := publishCh.Confirm(false); err != nil {
+		return fmt.Errorf("failed to enable confirms: %w", err)
+	}
+
+	// Register for confirmations BEFORE publishing
+	confirms := publishCh.NotifyPublish(make(chan amqp.Confirmation, 1))
+
 	// Publish with context timeout
 	publishCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Publish the message
-	if err := p.channel.PublishWithContext(
+	if err := publishCh.PublishWithContext(
 		publishCtx,
 		exchange,   // exchange
 		routingKey, // routing key
@@ -122,7 +137,6 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, exchange string, event 
 	}
 
 	// Wait for confirmation
-	confirms := p.channel.NotifyPublish(make(chan amqp.Confirmation, 1))
 	select {
 	case confirm := <-confirms:
 		if !confirm.Ack {

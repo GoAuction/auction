@@ -53,9 +53,9 @@ func main() {
 	// Configure bid consumer
 	// This consumes events from the "bid" service
 	bidConsumerConfig := rabbitmq.ConsumerConfig{
-		Exchange:       "auction.bid",         // Exchange where bid service publishes
-		QueueName:      "auction.bid.all.v1",  // Queue name: {service}.{domain}.{events}.{version}
-		RoutingKeys:    []string{"bid.*.v1"},  // Consume all bid events (placed, cancelled, won)
+		Exchange:       "bid.bidding",         // Exchange where bid service publishes
+		QueueName:      "bid.bidding.all.v1",  // Queue name: {service}.{domain}.{events}.{version}
+		RoutingKeys:    []string{"bid.#"},     // Consume all bid events (placed, cancelled, won)
 		ServiceName:    appConfig.ServiceName, // "auction"
 		PrefetchCount:  10,                    // Prefetch 10 messages from queue
 		WorkerPoolSize: 20,                    // Process up to 20 messages concurrently
@@ -110,7 +110,7 @@ func main() {
 
 	zap.L().Info("Worker service started successfully. Waiting for events...")
 	zap.L().Info("Consuming from exchanges",
-		zap.String("bidExchange", "auction.bid"),
+		zap.String("bidExchange", "bid.bidding"),
 	)
 	zap.L().Info("Press Ctrl+C to stop...")
 

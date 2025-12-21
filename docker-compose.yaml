@@ -89,6 +89,7 @@ services:
 
   auction-grpc-dev:
     profiles: ["dev"]
+    container_name: auction-grpc-dev
     build:
       context: .
       dockerfile: Dockerfile
@@ -111,6 +112,7 @@ services:
 
   auction-grpc:
     profiles: ["prod"]
+    container_name: auction-grpc
     build:
       context: .
       dockerfile: Dockerfile

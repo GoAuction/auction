@@ -29,6 +29,7 @@ func (h *BidEventHandler) HandleEvent(ctx context.Context, event *events.Event) 
 		zap.String("event", event.Event),
 		zap.String("version", event.Version),
 		zap.String("traceId", event.TraceID),
+		zap.Any("payload", event.Payload),
 	)
 
 	switch event.Event {
@@ -53,12 +54,12 @@ func (h *BidEventHandler) handleBidPlaced(ctx context.Context, event *events.Eve
 		return fmt.Errorf("malformed payload - unmarshal failed: %w", err)
 	}
 
-	itemID, ok := payload["itemId"].(string)
+	itemID, ok := payload["ItemID"].(string)
 	if !ok || itemID == "" {
 		return fmt.Errorf("malformed payload - itemId missing or invalid")
 	}
 
-	amountStr, ok := payload["amount"].(string)
+	amountStr, ok := payload["Amount"].(string)
 	if !ok || amountStr == "" {
 		return fmt.Errorf("malformed payload - amount missing or invalid")
 	}
