@@ -69,12 +69,12 @@ func (r *PgRepository) Create(ctx context.Context, req *app.CreateItemRequest) (
 			name, description, seller_id, currency_code,
 			start_price, bid_increment, reserve_price,
 			buyout_price, end_price, start_date, end_date,
-			status
+			status, extension_threshold_minutes, extension_duration_minutes
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7,
 			$8, $9, $10, $11,
-			$12
+			$12, $13, $14
 		) RETURNING id`
 
 	err = tx.QueryRowContext(ctx, query,
@@ -90,10 +90,12 @@ func (r *PgRepository) Create(ctx context.Context, req *app.CreateItemRequest) (
 		req.StartDate,
 		req.EndDate,
 		req.Status,
+		req.ExtensionThresholdMinutes,
+		req.ExtensionDurationMinutes,
 	).Scan(&itemID)
 
 	if err != nil {
-		return domain.Item{}, fmt.Errorf("failed to insert item: %w", err)
+		return domain.Item{}, err
 	}
 
 	// Insert item categories if provided
@@ -368,27 +370,33 @@ func (r *PgRepository) Update(ctx context.Context, item domain.Item) error {
             reserve_price = :reserve_price,
             buyout_price = :buyout_price,
             end_price = :end_price,
+            extension_threshold_minutes = :extension_threshold_minutes,
+            extension_duration_minutes = :extension_duration_minutes,
             start_date = :start_date,
             end_date = :end_date,
-            status = :status
+            status = :status,
+            version = version + 1
         WHERE id = :id
     `
 
-	params := map[string]interface{}{
-		"id":            item.ID,
-		"name":          item.Name,
-		"description":   item.Description,
-		"seller_id":     item.SellerID,
-		"currency_code": item.CurrencyCode,
-		"current_price": item.CurrentPrice,
-		"start_price":   item.StartPrice,
-		"bid_increment": item.BidIncrement,
-		"reserve_price": item.ReservePrice,
-		"buyout_price":  item.BuyoutPrice,
-		"end_price":     item.EndPrice,
-		"start_date":    item.StartDate,
-		"end_date":      item.EndDate,
-		"status":        item.Status,
+	params := map[string]any{
+		"id":                          item.ID,
+		"name":                        item.Name,
+		"description":                 item.Description,
+		"seller_id":                   item.SellerID,
+		"currency_code":               item.CurrencyCode,
+		"current_price":               item.CurrentPrice,
+		"start_price":                 item.StartPrice,
+		"bid_increment":               item.BidIncrement,
+		"reserve_price":               item.ReservePrice,
+		"buyout_price":                item.BuyoutPrice,
+		"end_price":                   item.EndPrice,
+		"start_date":                  item.StartDate,
+		"end_date":                    item.EndDate,
+		"extension_threshold_minutes": item.ExtensionThresholdMinutes,
+		"extension_duration_minutes":  item.ExtensionDurationMinutes,
+		"status":                      item.Status,
+		"version":                     item.Version,
 	}
 
 	_, err := r.db.NamedExecContext(ctx, query, params)

@@ -20,16 +20,18 @@ type UpdateItemHandler struct {
 }
 
 type UpdateItemRequest struct {
-	ItemID       string           `params:"id" validate:"required,uuid"`
-	Name         *string          `json:"name,omitempty"`
-	Description  *string          `json:"description,omitempty"`
-	CurrencyCode *string          `json:"currencyCode,omitempty" validate:"omitempty,iso4217"`
-	BidIncrement *decimal.Decimal `json:"bidIncrement,omitempty"`
-	ReservePrice *decimal.Decimal `json:"reservePrice,omitempty"`
-	BuyoutPrice  *decimal.Decimal `json:"buyoutPrice,omitempty"`
-	EndPrice     *decimal.Decimal `json:"endPrice,omitempty"`
-	EndDate      *time.Time       `json:"endDate,omitempty"`
-	Status       *string          `json:"status,omitempty" validate:"omitempty,oneof=draft active sold cancelled"`
+	ItemID                    string           `params:"id" validate:"required,uuid"`
+	Name                      *string          `json:"name,omitempty"`
+	Description               *string          `json:"description,omitempty"`
+	CurrencyCode              *string          `json:"currencyCode,omitempty" validate:"omitempty,iso4217"`
+	BidIncrement              *decimal.Decimal `json:"bidIncrement,omitempty"`
+	ReservePrice              *decimal.Decimal `json:"reservePrice,omitempty"`
+	BuyoutPrice               *decimal.Decimal `json:"buyoutPrice,omitempty"`
+	EndPrice                  *decimal.Decimal `json:"endPrice,omitempty"`
+	EndDate                   *time.Time       `json:"endDate,omitempty"`
+	Status                    *string          `json:"status,omitempty" validate:"omitempty,oneof=draft active sold cancelled"`
+	ExtensionThresholdMinutes *int             `json:"extensionThresholdMinutes,omitempty" db:"extension_threshold_minutes"`
+	ExtensionDurationMinutes  *int             `json:"extensionDurationMinutes,omitempty" db:"extension_duration_minutes"`
 }
 
 type UpdateItemResponse struct {
@@ -107,6 +109,14 @@ func (e UpdateItemHandler) Handle(ctx context.Context, req *UpdateItemRequest) (
 	}
 	if req.Status != nil {
 		item.Status = *req.Status
+	}
+
+	if req.ExtensionThresholdMinutes != nil {
+		item.ExtensionThresholdMinutes = req.ExtensionThresholdMinutes
+	}
+
+	if req.ExtensionDurationMinutes != nil {
+		item.ExtensionDurationMinutes = req.ExtensionDurationMinutes
 	}
 
 	err = e.repository.UpdateUserItem(ctx, item, userID)

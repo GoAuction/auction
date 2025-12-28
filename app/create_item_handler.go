@@ -18,19 +18,21 @@ type CreateItemHandler struct {
 }
 
 type CreateItemRequest struct {
-	Name         string           `json:"name" validate:"required" db:"name"`
-	Description  *string          `json:"description" db:"description"`
-	CurrencyCode string           `json:"currencyCode" validate:"required,iso4217" db:"currency_code"`
-	SellerID     string           `json:"sellerID,omitempty" db:"seller_id"`
-	StartPrice   decimal.Decimal  `json:"startPrice" validate:"required" db:"start_price"`
-	BidIncrement *decimal.Decimal `json:"bidIncrement" validate:"required" db:"bid_increment"`
-	ReservePrice *decimal.Decimal `json:"reservePrice,omitempty" db:"reserve_price"`
-	BuyoutPrice  *decimal.Decimal `json:"buyoutPrice,omitempty" db:"buyout_price"`
-	EndPrice     *decimal.Decimal `json:"endPrice,omitempty" db:"end_price"`
-	StartDate    time.Time        `json:"startDate" validate:"required" db:"start_date"`
-	EndDate      time.Time        `json:"endDate" validate:"required,gtfield=StartDate" db:"end_date"`
-	Status       string           `json:"status,omitempty" validate:"required,oneof=draft active sold cancelled" db:"status"`
-	CategoryIDs  []string         `json:"categoryIds,omitempty"`
+	Name                      string           `json:"name" validate:"required" db:"name"`
+	Description               *string          `json:"description" db:"description"`
+	CurrencyCode              string           `json:"currencyCode" validate:"required,iso4217" db:"currency_code"`
+	SellerID                  string           `json:"sellerID,omitempty" db:"seller_id"`
+	StartPrice                decimal.Decimal  `json:"startPrice" validate:"required" db:"start_price"`
+	BidIncrement              *decimal.Decimal `json:"bidIncrement" validate:"required" db:"bid_increment"`
+	ReservePrice              *decimal.Decimal `json:"reservePrice,omitempty" db:"reserve_price"`
+	BuyoutPrice               *decimal.Decimal `json:"buyoutPrice,omitempty" db:"buyout_price"`
+	EndPrice                  *decimal.Decimal `json:"endPrice,omitempty" db:"end_price"`
+	StartDate                 time.Time        `json:"startDate" validate:"required" db:"start_date"`
+	EndDate                   time.Time        `json:"endDate" validate:"required,gtfield=StartDate" db:"end_date"`
+	Status                    string           `json:"status,omitempty" validate:"required,oneof=draft active sold cancelled" db:"status"`
+	CategoryIDs               []string         `json:"categoryIds,omitempty"`
+	ExtensionThresholdMinutes *int             `json:"extensionThresholdMinutes,omitempty" db:"extension_threshold_minutes"`
+	ExtensionDurationMinutes  *int             `json:"extensionDurationMinutes,omitempty" db:"extension_duration_minutes"`
 }
 
 type CreateItemResponse struct {
@@ -71,9 +73,7 @@ func (e CreateItemHandler) Handle(ctx context.Context, req *CreateItemRequest) (
 		return nil, httperror.InternalServerError(
 			"item.create.create_failed",
 			"An error occurred while creating the item",
-			[]string{
-				err.Error(),
-			},
+			nil,
 		)
 	}
 
